@@ -182,16 +182,17 @@ contract PassportSBT is ERC721URIStorage, AccessControl, Pausable, ReentrancyGua
         _unpause();
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 firstTokenId,
-        uint256 batchSize
-    ) internal override {
-        super._update(to, tokenId, auth);
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        virtual
+        override
+        returns (address)
+    {
+        address from = _ownerOf(tokenId);
         if (from != address(0) && to != address(0)) {
             require(!_lockedTokens[tokenId], "Soulbound: token is locked");
         }
+        return super._update(to, tokenId, auth);
     }
 
     function _exists(uint256 tokenId) private view returns (bool) {
