@@ -32,21 +32,25 @@ func main() {
 	r.GET("/readyz", handler.ReadinessCheck)
 	r.GET("/metrics", handler.PrometheusMetrics)
 
+	credHandler := handler.NewCredentialHandler()
+	repHandler := handler.NewReputationHandler()
+	profHandler := handler.NewProfileHandler()
+
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.Auth(cfg.JWTSecret))
 	{
-		v1.GET("/credentials/:id", handler.GetCredential)
-		v1.POST("/credentials", handler.IssueCredential)
-		v1.POST("/credentials/verify", handler.VerifyCredential)
-		v1.POST("/credentials/:id/revoke", handler.RevokeCredential)
+		v1.GET("/credentials/:id", credHandler.GetCredential)
+		v1.POST("/credentials", credHandler.IssueCredential)
+		v1.POST("/credentials/verify", credHandler.VerifyCredential)
+		v1.POST("/credentials/:id/revoke", credHandler.RevokeCredential)
 
-		v1.GET("/reputation/:hash", handler.GetReputation)
-		v1.GET("/reputation/:hash/history", handler.GetReputationHistory)
-		v1.POST("/endorsements", handler.AddEndorsement)
-		v1.GET("/endorsements/:hash", handler.GetEndorsements)
+		v1.GET("/reputation/:hash", repHandler.GetReputation)
+		v1.GET("/reputation/:hash/history", repHandler.GetReputationHistory)
+		v1.POST("/endorsements", repHandler.AddEndorsement)
+		v1.GET("/endorsements/:hash", repHandler.GetEndorsements)
 
-		v1.GET("/profiles/:id", handler.GetProfile)
-		v1.PUT("/profiles/:id", handler.UpdateProfile)
+		v1.GET("/profiles/:id", profHandler.GetProfile)
+		v1.PUT("/profiles/:id", profHandler.UpdateProfile)
 	}
 
 	srv := &http.Server{
