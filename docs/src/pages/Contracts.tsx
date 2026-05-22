@@ -53,15 +53,18 @@ const contracts = [
 export function ContractsPage() {
   return (
     <div>
-      <DotMatrixText text="SMART CONTRACTS" size={24} />
+      <DotMatrixText>SMART CONTRACTS</DotMatrixText>
       <p style={{ color: "#aaa", fontSize: 13, marginBottom: 32 }}>
         Solidity 0.8.28 · Hardhat · Foundry · ERC-5192 · Layer 2
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {contracts.map((c) => (
-          <NothingCard key={c.name} title={c.name}>
-            <PillBadge label={c.badge} style={{ marginBottom: 8 }} />
+          <NothingCard key={c.name}>
+            <PillBadge variant="live">{c.badge}</PillBadge>
+            <div style={{ fontWeight: "bold", fontSize: 14, margin: "8px 0", color: "#fff" }}>
+              {c.name}
+            </div>
             <p style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
               {c.description}
             </p>
@@ -77,7 +80,10 @@ export function ContractsPage() {
         ))}
       </div>
 
-      <NothingCard title="Deployed Sizes" style={{ marginTop: 32 }}>
+      <NothingCard style={{ marginTop: 32 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Deployed Sizes
+        </div>
         <pre style={{
           background: "#111",
           padding: 16,
@@ -94,7 +100,10 @@ PassportFacade:      3.508 KiB / 4.169 KiB`}
         </pre>
       </NothingCard>
 
-      <NothingCard title="Test Results" style={{ marginTop: 16 }}>
+      <NothingCard style={{ marginTop: 16 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Test Results
+        </div>
         <pre style={{
           background: "#111",
           padding: 16,
@@ -102,12 +111,11 @@ PassportFacade:      3.508 KiB / 4.169 KiB`}
           fontSize: 12,
           color: "#0f0",
         }}>
-{`  AttestationRegistry    ✔ 4 passing (should create, revoke, verify, reject expired)
-  DisputeResolutionDAO   ✔ 4 passing (file, evidence, vote+resolve, reject non-juror)
-  EndorsementRegistry    ✔ 3 passing (add, accumulate, reject invalid)
-  PassportSBT            ✔ 10 passing (deploy, mint, lock, revoke, burn, expire,
-                            role, interface, pause, credentials by subject)
-  ReputationOracle       ✔ 5 passing (update, slash, access, proof, no negative)
+{`  AttestationRegistry    ✔ 4 passing
+  DisputeResolutionDAO   ✔ 4 passing
+  EndorsementRegistry    ✔ 3 passing
+  PassportSBT            ✔ 10 passing
+  ReputationOracle       ✔ 5 passing
 
   Total: 26 passing`}
         </pre>
