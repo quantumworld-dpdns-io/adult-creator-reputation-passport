@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rust-data
+  namespace: reputation-passport
+  labels:
+    app: rust-data
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rust-data
+  template:
+    metadata:
+      labels:
+        app: rust-data
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+    spec:
+      containers:
+        - name: rust-data
+          image: ghcr.io/quantumworld-dpdns-io/rust-data:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: RUST_LOG
+              value: info
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rust-data
+  namespace: reputation-passport
+spec:
+  selector:
+    app: rust-data
+  ports:
+    - port: 8081
+      targetPort: 8081
+      name: http
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rust-data-hpa
+  namespace: reputation-passport
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rust-data
+  minReplicas: 3
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
