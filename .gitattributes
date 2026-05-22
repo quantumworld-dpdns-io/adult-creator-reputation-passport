@@ -1,0 +1,55 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# Go
+*.go text diff=golang
+*.mod text
+*.sum text
+
+# Rust
+*.rs text diff=rust
+*.toml text
+
+# Python
+*.py text diff=python
+*.pyw text
+*.pyi text
+
+# Julia
+*.jl text
+
+# QASM
+*.qasm text
+*.qpic text
+
+# Solidity
+*.sol text
+
+# Infrastructure
+*.tf text
+*.tfvars text
+*.yaml text
+*.yml text
+*.json text
+
+# Docker
+Dockerfile text
+docker-compose*.yml text
+.dockerignore text
+
+# Documentation
+*.md text
+*.rst text
+*.txt text
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.tar.gz binary
+*.zip binary
