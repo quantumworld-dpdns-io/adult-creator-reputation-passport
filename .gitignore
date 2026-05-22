@@ -1,25 +1,103 @@
 # OS
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
 
 # Editor
 .vscode/
 .idea/
+*.iml
 *.swp
-
-# Build artifacts
-dist/
-build/
-__pycache__/
-*.pyc
-*.class
-
-# Dependencies
-node_modules/
-vendor/
+*.swo
+*~
 
 # Environment
 .env
 .env.*
 !.env.example
+
+# Build artifacts
+dist/
+build/
+target/
+bin/
+*.o
+*.so
+*.dylib
+*.exe
+*.dll
+
+# Go
+vendor/
+*.test
+*.out
+go.work
+
+# Rust
+src/rust/target/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+*.egg
+
+# Julia
+src/julia/Manifest.toml
+*.ji
+
+# Node / Web3
+node_modules/
+contracts/hardhat/cache/
+contracts/hardhat/artifacts/
+contracts/foundry/out/
+contracts/foundry/cache/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfplan
+*.tfvars
+!.terraform/modules
+
+# Pulumi
+pulumi/**/Pulumi.*.yaml
+!pulumi/**/Pulumi.yaml
+pulumi/**/state/
+
+# Helm
+helm/**/charts/
+
+# Docker
+.docker/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Secrets
+**/secrets/**
+!**/secrets/*.example
+*.pem
+*.key
+!certs/*.example
+
+# Scripts
 scripts/auto_commit.sh
+
+# Temp
+tmp/
+temp/
+*.tmp
