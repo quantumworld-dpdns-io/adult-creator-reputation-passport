@@ -1,0 +1,7 @@
+name: reputation-passport-infra
+description: Infrastructure for Adult Creator Reputation Passport
+runtime: go
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: go
