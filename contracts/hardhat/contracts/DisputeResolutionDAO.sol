@@ -112,6 +112,16 @@ contract DisputeResolutionDAO is AccessControl, Pausable, ReentrancyGuard {
         emit EvidenceSubmitted(disputeId, msg.sender, uri);
     }
 
+    function startDeliberation(uint256 disputeId)
+        external
+        onlyRole(MEDIATOR_ROLE)
+        whenNotPaused
+    {
+        Dispute storage d = _disputes[disputeId];
+        require(d.status == DisputeStatus.Evidence, "Not in evidence phase");
+        d.status = DisputeStatus.Deliberation;
+    }
+
     function castVote(uint256 disputeId, Resolution vote, string memory rationale)
         external
         onlyRole(JUROR_ROLE)
