@@ -1,0 +1,152 @@
+# Kong AI Gateway Declarative Configuration
+# Manage with: deck gateway sync kong.yml
+
+_format_version: "3.0"
+_transform: true
+
+services:
+  # Go API Service
+  - name: go-api
+    url: http://go-api:8080
+    routes:
+      - name: go-api-routes
+        paths:
+          - /api/v1/credentials
+          - /api/v1/profiles
+          - /api/v1/notifications
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+      - name: jwt
+        config:
+          claims_to_verify:
+            - exp
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+            - X-Request-ID
+          max_age: 3600
+          credentials: true
+
+  # Rust Data Service
+  - name: rust-data
+    url: http://rust-data:8081
+    routes:
+      - name: rust-data-routes
+        paths:
+          - /api/v1/reputation
+          - /api/v1/analytics
+        strip_path: false
+        methods:
+          - GET
+          - POST
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          hour: 5000
+          policy: local
+
+  # Python AI Service
+  - name: python-ai
+    url: http://python-ai:8082
+    routes:
+      - name: python-ai-routes
+        paths:
+          - /api/v1/ai
+        strip_path: false
+        methods:
+          - GET
+          - POST
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          hour: 500
+          policy: local
+      - name: ai-proxy
+        config:
+          model:
+            provider: ollama
+            name: llama3.2
+            options:
+              temperature: 0.7
+              max_tokens: 2048
+          auth:
+            header_name: Authorization
+            header_value: Bearer ${AI_API_KEY}
+          logging:
+            log_requests: true
+            log_responses: true
+            log_payloads: true
+
+  # Quantum Service
+  - name: quantum
+    url: http://quantum:8084
+    routes:
+      - name: quantum-routes
+        paths:
+          - /api/v1/quantum
+        strip_path: false
+        methods:
+          - GET
+          - POST
+    plugins:
+      - name: key-auth
+        config:
+          key_names:
+            - apikey
+          hide_credentials: true
+
+consumers:
+  - username: admin
+    keyauth_credentials:
+      - key: admin-api-key-2026
+    jwt_secrets:
+      - secret: admin-jwt-secret
+        algorithm: HS256
+  - username: creator-service
+    jwt_secrets:
+      - secret: creator-jwt-secret
+        algorithm: HS256
+
+plugins:
+  - name: prometheus
+    service: go-api
+    config:
+      per_consumer: false
+
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - X-Kong-Proxy: true
+          - X-API-Version: "1.0"
+
+  - name: bot-detection
+    config:
+      allow:
+        - - Mozilla
+      deny:
+        - - curl
+        - - wget
+        - - Go-http-client

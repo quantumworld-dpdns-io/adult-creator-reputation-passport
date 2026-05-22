@@ -1,0 +1,45 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        "group:allNonMajor",
+        "schedule:weekly"
+    ],
+    "labels": ["dependencies"],
+    "packageRules": [
+        {
+            "matchManagers": ["gomod"],
+            "matchPaths": ["src/go/**"],
+            "groupName": "Go dependencies"
+        },
+        {
+            "matchManagers": ["cargo"],
+            "matchPaths": ["src/rust/**"],
+            "groupName": "Rust dependencies"
+        },
+        {
+            "matchManagers": ["pip_requirements", "poetry"],
+            "matchPaths": ["src/python/**"],
+            "groupName": "Python dependencies"
+        },
+        {
+            "matchManagers": ["dockerfile"],
+            "groupName": "Docker dependencies"
+        },
+        {
+            "matchManagers": ["github-actions"],
+            "groupName": "GitHub Actions dependencies"
+        },
+        {
+            "matchManagers": ["terraform"],
+            "groupName": "Terraform dependencies"
+        },
+        {
+            "matchUpdateTypes": ["major"],
+            "labels": ["dependencies", "major"]
+        }
+    ],
+    "dependencyDashboard": true,
+    "prConcurrentLimit": 10,
+    "prHourlyLimit": 5
+}

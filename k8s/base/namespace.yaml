@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reputation-passport
+  labels:
+    app.kubernetes.io/name: reputation-passport
+    app.kubernetes.io/part-of: adult-creator-reputation-passport
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reputation-passport-prod
+  labels:
+    app.kubernetes.io/name: reputation-passport
+    app.kubernetes.io/part-of: adult-creator-reputation-passport
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reputation-passport-staging
+  labels:
+    app.kubernetes.io/name: reputation-passport
+    app.kubernetes.io/part-of: adult-creator-reputation-passport

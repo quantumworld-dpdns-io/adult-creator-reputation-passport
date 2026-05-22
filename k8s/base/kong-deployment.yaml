@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: reputation-passport
+  labels:
+    app: kong
+    tier: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+        tier: gateway
+    spec:
+      containers:
+        - name: kong
+          image: kong:3.8
+          ports:
+            - containerPort: 8000
+              name: proxy
+            - containerPort: 8001
+              name: admin
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: "/etc/kong/kong.yml"
+            - name: KONG_PLUGINS
+              value: "bundled,ai-proxy"
+            - name: KONG_PROXY_ACCESS_LOG
+              value: "/dev/stdout"
+            - name: KONG_ADMIN_ACCESS_LOG
+              value: "/dev/stdout"
+            - name: KONG_PROXY_ERROR_LOG
+              value: "/dev/stderr"
+            - name: KONG_ADMIN_ERROR_LOG
+              value: "/dev/stderr"
+          volumeMounts:
+            - name: kong-config
+              mountPath: /etc/kong/kong.yml
+              subPath: kong.yml
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8001
+          readinessProbe:
+            httpGet:
+              path: /status/ready
+              port: 8001
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+      volumes:
+        - name: kong-config
+          configMap:
+            name: kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong
+  namespace: reputation-passport
+spec:
+  selector:
+    app: kong
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: proxy
+    - port: 8001
+      targetPort: 8001
+      name: admin
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: reputation-passport
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    services:
+      - name: go-api
+        url: http://go-api:8080
+        routes:
+          - name: go-api-routes
+            paths:
+              - /api/v1
+        plugins:
+          - name: rate-limiting
+            config: { minute: 100 }

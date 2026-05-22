@@ -1,0 +1,58 @@
+# Hermes Agent Configuration
+name: reputation-passport-agent
+version: 1.0
+
+agent:
+  model: gpt-4o
+  temperature: 0.3
+  max_tokens: 4096
+
+skills:
+  - name: credential-verification
+    path: skills/credential-verification
+    triggers:
+      - event: credential.issued
+      - schedule: "0 */6 * * *"
+
+  - name: reputation-monitoring
+    path: skills/reputation-monitoring
+    triggers:
+      - event: reputation.updated
+      - schedule: "*/30 * * * *"
+
+  - name: dispute-mediation
+    path: skills/dispute-mediation
+    triggers:
+      - event: dispute.filed
+
+memory:
+  type: persistent
+  backend: postgres
+  connection_string: postgresql://postgres:${POSTGRES_PASSWORD}@localhost:5432/reputation_passport
+
+tools:
+  - name: reputation-api
+    type: http
+    config:
+      base_url: http://go-api:8080/api/v1
+      headers:
+        Authorization: Bearer ${HERMES_API_KEY}
+
+  - name: blockchain-reader
+    type: http
+    config:
+      base_url: http://localhost:8545
+
+notifications:
+  - type: slack
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    events:
+      - credential.revoked
+      - dispute.resolved
+      - reputation.anomaly
+
+  - type: telegram
+    bot_token: ${TELEGRAM_BOT_TOKEN}
+    chat_id: ${TELEGRAM_CHAT_ID}
+    events:
+      - credential.issued

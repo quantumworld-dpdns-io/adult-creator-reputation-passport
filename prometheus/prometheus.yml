@@ -1,0 +1,70 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: reputation-passport
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  - job_name: go-api
+    static_configs:
+      - targets: ["go-api:8080"]
+        labels:
+          service: go-api
+
+  - job_name: rust-data
+    static_configs:
+      - targets: ["rust-data:8081"]
+        labels:
+          service: rust-data
+
+  - job_name: python-ai
+    static_configs:
+      - targets: ["python-ai:8082"]
+        labels:
+          service: python-ai
+
+  - job_name: kong
+    static_configs:
+      - targets: ["kong:8001"]
+        labels:
+          service: kong
+
+  - job_name: nginx
+    static_configs:
+      - targets: ["nginx:80"]
+        labels:
+          service: nginx
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: postgres
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          service: redis
+
+  - job_name: nats
+    static_configs:
+      - targets: ["nats:8222"]
+        labels:
+          service: nats
+
+  - job_name: node
+    static_configs:
+      - targets:
+          - "node-exporter:9100"
+        labels:
+          service: node

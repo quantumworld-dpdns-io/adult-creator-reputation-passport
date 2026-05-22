@@ -1,0 +1,17 @@
+{
+  "project": "adult-creator-reputation-passport",
+  "allowedTools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Bash",
+    "Glob",
+    "Grep"
+  ],
+  "systemPrompt": "You are building a polyglot microservices project. Code conventions: Go (Gin), Rust (Axum), Python (FastAPI), Julia (Genie). Follow existing patterns in each language.",
+  "permissions": {
+    "allowReads": true,
+    "allowWrites": true,
+    "allowCommands": true
+  }
+}

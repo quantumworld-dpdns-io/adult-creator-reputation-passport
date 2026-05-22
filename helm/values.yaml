@@ -1,0 +1,147 @@
+global:
+  environment: production
+  imageRegistry: ghcr.io/quantumworld-dpdns-io
+  imageTag: latest
+  imagePullSecrets: []
+  labels:
+    app.kubernetes.io/part-of: adult-creator-reputation-passport
+
+goApi:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: go-api
+    tag: latest
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  service:
+    port: 8080
+  env:
+    ENVIRONMENT: production
+
+rustData:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: rust-data
+    tag: latest
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+
+pythonAi:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: python-ai
+    tag: latest
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+    limits:
+      cpu: 4
+      memory: 4Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+nginx:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: nginx-pqc
+    tag: latest
+  service:
+    type: LoadBalancer
+    ports:
+      http: 80
+      https: 443
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+
+kong:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: kong
+    tag: "3.8"
+  dbless: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 1Gi
+
+postgresql:
+  enabled: true
+  auth:
+    database: reputation_passport
+  primary:
+    persistence:
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 10Gi
+
+prometheus:
+  enabled: true
+  alertmanager:
+    enabled: true
+  kubeStateMetrics:
+    enabled: true
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default

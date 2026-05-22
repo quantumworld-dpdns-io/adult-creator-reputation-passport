@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package reputation.v1;
+
+option go_package = "github.com/quantumworld-dpdns-io/adult-creator-reputation-passport/proto/reputation/v1;reputationv1";
+
+service ReputationService {
+    rpc GetScore(GetScoreRequest) returns (GetScoreResponse);
+    rpc UpdateScore(UpdateScoreRequest) returns (UpdateScoreResponse);
+    rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
+    rpc GetEndorsements(GetEndorsementsRequest) returns (GetEndorsementsResponse);
+    rpc AddEndorsement(AddEndorsementRequest) returns (AddEndorsementResponse);
+}
+
+message ReputationScore {
+    string subject_hash = 1;
+    double overall_score = 2;
+    double reliability_score = 3;
+    double professionalism_score = 4;
+    double community_trust_score = 5;
+    int64 total_endorsements = 6;
+    int64 total_reviews = 7;
+    int64 last_updated = 8;
+    string pqc_proof_hash = 9;
+}
+
+message GetScoreRequest {
+    string subject_hash = 1;
+}
+
+message GetScoreResponse {
+    ReputationScore score = 1;
+}
+
+message UpdateScoreRequest {
+    string subject_hash = 1;
+    map<string, double> score_deltas = 2;
+    string reason = 3;
+}
+
+message UpdateScoreResponse {
+    ReputationScore score = 1;
+}
+
+message Endorsement {
+    string id = 1;
+    string from_hash = 2;
+    string to_hash = 3;
+    double weight = 4;
+    string category = 5;
+    string comment = 6;
+    int64 created_at = 7;
+    string signature = 8;
+}
+
+message GetEndorsementsRequest {
+    string subject_hash = 1;
+    int32 page_size = 2;
+    string page_token = 3;
+}
+
+message GetEndorsementsResponse {
+    repeated Endorsement endorsements = 1;
+    string next_page_token = 2;
+    int32 total_count = 3;
+}
+
+message AddEndorsementRequest {
+    string from_hash = 1;
+    string to_hash = 2;
+    double weight = 3;
+    string category = 4;
+    string comment = 5;
+    string signature = 6;
+}
+
+message AddEndorsementResponse {
+    Endorsement endorsement = 1;
+}
+
+message ReputationEvent {
+    string subject_hash = 1;
+    double score_before = 2;
+    double score_after = 3;
+    string reason = 4;
+    int64 occurred_at = 5;
+}
+
+message GetHistoryRequest {
+    string subject_hash = 1;
+    int32 limit = 2;
+    int64 from_timestamp = 3;
+    int64 to_timestamp = 4;
+}
+
+message GetHistoryResponse {
+    repeated ReputationEvent events = 1;
+}
