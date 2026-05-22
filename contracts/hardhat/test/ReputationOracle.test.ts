@@ -6,19 +6,19 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 describe("ReputationOracle", function () {
   let oracle: ReputationOracle;
   let admin: SignerWithAddress;
-  let oracleRole: SignerWithAddress;
+  let nonOracle: SignerWithAddress;
 
   beforeEach(async function () {
-    [admin, oracleRole] = await ethers.getSigners();
+    [admin, nonOracle] = await ethers.getSigners();
     const ReputationOracle = await ethers.getContractFactory("ReputationOracle");
     oracle = await ReputationOracle.deploy();
     await oracle.waitForDeployment();
   });
 
   it("should update reputation", async function () {
-    await oracle.connect(admin).updateReputation(
-      "subject1", 85, 90, 80, 85, 10, 5,
-      ethers.keccak256(ethers.toUtf8Bytes("proof"))
+    const proofHash = ethers.keccak256(ethers.toUtf8Bytes("proof"));
+    await oracle.updateReputation(
+      "subject1", 85, 90, 80, 85, 10, 5, proofHash
     );
     const rep = await oracle.getReputation("subject1");
     expect(rep.overallScore).to.equal(85);
@@ -27,23 +27,32 @@ describe("ReputationOracle", function () {
   });
 
   it("should slash reputation", async function () {
-    await oracle.connect(admin).updateReputation(
-      "subject1", 100, 100, 100, 100, 0, 0, "0x00"
-    );
-    await oracle.connect(admin).slashReputation("subject1", 30, "Policy violation");
+    const proofHash = ethers.keccak256(ethers.toUtf8Bytes("proof"));
+    await oracle.updateReputation("subject1", 100, 100, 100, 100, 0, 0, proofHash);
+    await oracle.slashReputation("subject1", 30, "Policy violation");
     expect(await oracle.getReputationScore("subject1")).to.equal(70);
   });
 
   it("should enforce role-based access", async function () {
+    const proofHash = ethers.keccak256(ethers.toUtf8Bytes("proof"));
     await expect(
-      oracle.connect(oracleRole).updateReputation("s", 1, 1, 1, 1, 0, 0, "0x00")
+      oracle.connect(nonOracle).updateReputation("s", 1, 1, 1, 1, 0, 0, proofHash)
     ).to.be.reverted;
   });
 
   it("should verify proof hash", async function () {
     const proofHash = ethers.keccak256(ethers.toUtf8Bytes("valid-proof"));
-    await oracle.connect(admin).updateReputation("s", 90, 90, 90, 90, 5, 3, proofHash);
+    await oracle.updateReputation("s", 90, 90, 90, 90, 5, 3, proofHash);
     expect(await oracle.verifyReputationProof("s", proofHash)).to.be.true;
-    expect(await oracle.verifyReputationProof("s", ethers.keccak256(ethers.toUtf8Bytes("fake")))).to.be.false;
+    expect(
+      await oracle.verifyReputationProof("s", ethers.keccak256(ethers.toUtf8Bytes("fake")))
+    ).to.be.false;
+  });
+
+  it("should not slash below zero", async function () {
+    const proofHash = ethers.keccak256(ethers.toUtf8Bytes("proof"));
+    await oracle.updateReputation("s", 10, 10, 10, 10, 0, 0, proofHash);
+    await oracle.slashReputation("s", 100, "Massive slash");
+    expect(await oracle.getReputationScore("s")).to.equal(0);
   });
 });
