@@ -1,0 +1,229 @@
+version: "3.9"
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+  data:
+    driver: bridge
+  ai:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  chroma_data:
+  qdrant_data:
+  milvus_data:
+  weaviate_data:
+  nats_data:
+
+services:
+  # Gateway Layer
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      kong:
+        condition: service_healthy
+    logging: *default-logging
+    restart: unless-stopped
+
+  kong:
+    image: kong:3.8
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8443:8443"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PLUGINS: "bundled,ai-proxy"
+    volumes:
+      - ./kong/kong.yml:/etc/kong/kong.yml:ro
+    networks:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    restart: unless-stopped
+
+  # Application Layer
+  go-api:
+    build:
+      context: ./src/go
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      GO_API_PORT: "8080"
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: reputation_passport
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    restart: unless-stopped
+
+  rust-data:
+    build:
+      context: ./src/rust
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      RUST_LOG: info
+    networks:
+      - backend
+      - data
+    logging: *default-logging
+    restart: unless-stopped
+
+  python-ai:
+    build:
+      context: ./src/python
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    networks:
+      - backend
+      - ai
+    logging: *default-logging
+    restart: unless-stopped
+
+  quantum:
+    build:
+      context: ./src/qasm
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    networks:
+      - backend
+
+  # Data Layer
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: reputation_passport
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - data
+    logging: *default-logging
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    command: "-js -sd /data"
+    networks:
+      - data
+    logging: *default-logging
+    restart: unless-stopped
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - backend
+    logging: *default-logging
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - backend
+    logging: *default-logging
+    restart: unless-stopped
