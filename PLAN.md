@@ -1,0 +1,1701 @@
+# Adult Creator Reputation Passport — Implementation Plan
+
+> 1,405 commits across 22 phases
+
+---
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                          NGINX + PQC Reverse Proxy                   │
+│      (SSL/TLS with oqs-provider, ML-KEM, ML-DSA hybrid key exchange)│
+└──────────┬───────────────────────────────────────┬───────────────────┘
+           │                                       │
+┌──────────▼──────────────────────┐   ┌───────────▼───────────────────┐
+│         KONG AI Gateway          │   │  Kong Admin API / Plugins     │
+│  (AI proxy, auth, rate-limit)    │   │  (Auth, caching, logging)     │
+└──┬──────────┬──────────┬────────-┘   └───────────────────────────────┘
+   │          │          │
+   ▼          ▼          ▼
+┌────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Go API │ │ Rust   │ │ Python   │ │ Julia    │ │ QASM/PQC │ │ Web3 SC  │
+│ Server │ │ Data   │ │ AI/ML    │ │ Sci Comp │ │ Quantum  │ │ SBT Pass │
+│ (Gin)  │ │(Axum)  │ │(FastAPI) │ │ (Genie)  │ │ Services │ │(Solidity)│
+└────────┘ └────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+   │          │          │          │          │             │
+   └──────────┴──────────┴──────────┴──────────┴─────────────┘
+                              │
+                 ┌────────────▼─────────────────┐
+                 │     Data & Storage Layer       │
+                 │ (Postgres, Redis, Vector DBs,  │
+                 │  Iceberg, S3, Blockchains)      │
+                 └─────────────────────────────────┘
+```
+
+## Tool Integration Map
+
+| Category | Tools Integrated | Microservice |
+|----------|-----------------|--------------|
+| AI Agents | Claude Code, Codex Desktop, Devin, Hermes Agent | Dev workflow |
+| AI Serving | Ollama, vLLM, SGLang, llama.cpp, LM Studio | Python Srv |
+| Vector DBs | Chroma, Qdrant, Milvus, Weaviate, LanceDB | Python + Rust |
+| Observability | W&B Weave, OpenTelemetry, Prometheus, Grafana | All services |
+| Data Lakehouse | DuckDB, Trino, Iceberg, Arrow, DataFusion | Rust Srv |
+| Agent Protocols | Agent Skills, MCPB/DXT, MCP | Python Srv |
+| Cloud-Native | Cilium Tetragon, K8s, Docker Swarm | Infra layer |
+| Security | PQC (liboqs), OWASP ZAP, WAF | All layers |
+| Blockchain | Solidity, Hardhat, Foundry, Layer 2 | Web3 Srv |
+
+---
+
+## Phase 0: Project Foundation & Monorepo Setup (25 commits)
+
+- [ ] [0.01] Initialize monorepo with root go.mod, Cargo.toml, pyproject.toml, Project.toml
+- [ ] [0.02] Set up root Makefile with top-level build targets
+- [ ] [0.03] Create directory structure: src/go/, src/rust/, src/python/, src/julia/, src/qasm/, contracts/
+- [ ] [0.04] Root docker-compose.yml for all microservices
+- [ ] [0.05] .editorconfig, .gitattributes, comprehensive .gitignore
+- [ ] [0.06] Root .env.example with all service variables
+- [ ] [0.07] README.md — expand with architecture diagram, quick start
+- [ ] [0.08] LICENSE — MIT with copyright attribution
+- [ ] [0.09] docs/ARCHITECTURE.md — detailed architecture decisions
+- [ ] [0.10] docs/ADRS/ — decision records directory
+- [ ] [0.11] Pre-commit hooks (gofmt, cargo fmt, black, ruff)
+- [ ] [0.12] Renovate/Dependabot config for dependency updates
+- [ ] [0.13] Common protobuf definitions (src/proto/)
+- [ ] [0.14] gRPC service definitions for inter-service communication
+- [ ] [0.15] Generate protobuf stubs for all languages
+- [ ] [0.16] Common health check endpoint specs (all services)
+- [ ] [0.17] Common observability config (OpenTelemetry SDK init)
+- [ ] [0.18] Service registry / discovery config (Consul or etcd)
+- [ ] [0.19] Centralized config management approach (Vault/Consul)
+- [ ] [0.20] Logging standards document (structured JSON logs)
+- [ ] [0.21] Error handling conventions across all languages
+- [ ] [0.22] API versioning strategy document
+- [ ] [0.23] Rate limiting strategy document
+- [ ] [0.24] CORS, security headers policy
+- [ ] [0.25] Contribution guidelines + code of conduct
+
+## Phase 1: Go Core Backend Services (120 commits)
+
+- [ ] [1.01] Go module init: go.mod for src/go/reputation-api/
+- [ ] [1.02] Go HTTP framework setup (Gin/Fiber with middleware)
+- [ ] [1.03] Health check endpoint implementation
+- [ ] [1.04] Metrics endpoint (/metrics for Prometheus)
+- [ ] [1.05] Structured JSON logging middleware
+- [ ] [1.06] Request ID / tracing middleware (OpenTelemetry)
+- [ ] [1.07] CORS middleware configuration
+- [ ] [1.08] Rate limiting middleware (token bucket)
+- [ ] [1.09] Authentication middleware (JWT validation)
+- [ ] [1.10] RBAC authorization middleware
+- [ ] [1.11] Error handling middleware (consistent error responses)
+- [ ] [1.12] User model definition (Postgres schema)
+- [ ] [1.13] User registration endpoint
+- [ ] [1.14] User login / authentication endpoint
+- [ ] [1.15] OAuth2 integration (Google, GitHub)
+- [ ] [1.16] Session management service
+- [ ] [1.17] Creator profile model
+- [ ] [1.18] Creator profile CRUD endpoints
+- [ ] [1.19] Creator verification workflow
+- [ ] [1.20] KYC integration (basic document verification)
+- [ ] [1.21] Identity hashing / pseudonymization service
+- [ ] [1.22] Credential schema definition
+- [ ] [1.23] Credential issuance endpoint (soulbound)
+- [ ] [1.24] Credential verification endpoint
+- [ ] [1.25] Credential revocation endpoint (with proof)
+- [ ] [1.26] Credential expiration / renewal logic
+- [ ] [1.27] Reputation score model
+- [ ] [1.28] Reputation scoring algorithm (weighted sum)
+- [ ] [1.29] Reputation update event handler
+- [ ] [1.30] Reputation query endpoint (by creator hash)
+- [ ] [1.31] Reputation history endpoint (time-series)
+- [ ] [1.32] Endorsement model
+- [ ] [1.33] Endorsement creation endpoint
+- [ ] [1.34] Endorsement verification endpoint
+- [ ] [1.35] Endorsement trust graph service
+- [ ] [1.36] Review model (for creators)
+- [ ] [1.37] Review submission endpoint
+- [ ] [1.38] Review moderation endpoint
+- [ ] [1.39] Review aggregation service
+- [ ] [1.40] Dispute resolution model
+- [ ] [1.41] Dispute filing endpoint
+- [ ] [1.42] Dispute resolution workflow
+- [ ] [1.43] Report / flag content endpoint
+- [ ] [1.44] Notification model and service
+- [ ] [1.45] Email notification adapter
+- [ ] [1.46] In-app notification endpoint (SSE/WebSocket)
+- [ ] [1.47] Audit log model (immutable)
+- [ ] [1.48] Audit log ingestion endpoint
+- [ ] [1.49] Audit log query endpoint
+- [ ] [1.50] Admin user management endpoints
+- [ ] [1.51] Admin credential management endpoints
+- [ ] [1.52] Admin reputation adjustment endpoint
+- [ ] [1.53] Admin audit log viewer
+- [ ] [1.54] Marketplace listing model (optional)
+- [ ] [1.55] Marketplace listing CRUD
+- [ ] [1.56] Search endpoint (basic text search)
+- [ ] [1.57] Category/tag model
+- [ ] [1.58] Category assignment endpoint
+- [ ] [1.59] Trending creators endpoint
+- [ ] [1.60] Featured creators endpoint
+- [ ] [1.61] Postgres connection pool setup (pgx)
+- [ ] [1.62] Redis connection setup (go-redis)
+- [ ] [1.63] Database migration framework (golang-migrate)
+- [ ] [1.64] Initial migration: users, profiles tables
+- [ ] [1.65] Migration: credentials table
+- [ ] [1.66] Migration: reputation scores table
+- [ ] [1.67] Migration: endorsements table
+- [ ] [1.68] Migration: reviews table
+- [ ] [1.69] Migration: disputes table
+- [ ] [1.70] Migration: audit_logs table
+- [ ] [1.71] Migration: marketplace listings table
+- [ ] [1.72] Migration: notifications table
+- [ ] [1.73] Migration indexes for performance
+- [ ] [1.74] Repository pattern implementation (users)
+- [ ] [1.75] Repository pattern (credentials)
+- [ ] [1.76] Repository pattern (reputation)
+- [ ] [1.77] Repository pattern (endorsements)
+- [ ] [1.78] Repository pattern (reviews)
+- [ ] [1.79] Repository pattern (disputes)
+- [ ] [1.80] Repository pattern (audit logs)
+- [ ] [1.81] Repository pattern (marketplace)
+- [ ] [1.82] Unit tests: auth service
+- [ ] [1.83] Unit tests: user service
+- [ ] [1.84] Unit tests: credential service
+- [ ] [1.85] Unit tests: reputation service
+- [ ] [1.86] Unit tests: endorsement service
+- [ ] [1.87] Unit tests: review service
+- [ ] [1.88] Unit tests: dispute resolution
+- [ ] [1.89] Unit tests: repository layer
+- [ ] [1.90] Integration tests: API endpoints
+- [ ] [1.91] Integration tests: database operations
+- [ ] [1.92] Integration tests: auth flow
+- [ ] [1.93] Go integration tests with testcontainers
+- [ ] [1.94] Load test script (k6) for Go services
+- [ ] [1.95] Graceful shutdown handler
+- [ ] [1.96] Signal handling (SIGTERM, SIGINT)
+- [ ] [1.97] Pprof endpoint for profiling
+- [ ] [1.98] Config file parsing (YAML/env)
+- [ ] [1.99] Swagger/OpenAPI spec generation
+- [ ] [1.100] API docs endpoint (swagger UI)
+- [ ] [1.101] Caching layer (Redis, LRU)
+- [ ] [1.102] Cache invalidation strategy
+- [ ] [1.103] Batch processing service (background jobs)
+- [ ] [1.104] Scheduled tasks (cron inside Go)
+- [ ] [1.105] WebSocket hub for real-time events
+- [ ] [1.106] WebSocket connection management
+- [ ] [1.107] Graceful WebSocket shutdown
+- [ ] [1.108] Circuit breaker pattern (hystrix-go)
+- [ ] [1.109] Retry logic with exponential backoff
+- [ ] [1.110] Bulkhead pattern for resource isolation
+- [ ] [1.111] Feature flags service
+- [ ] [1.112] A/B testing framework support
+- [ ] [1.113] API response pagination helper
+- [ ] [1.114] API filtering and sorting helpers
+- [ ] [1.115] Request validation library integration (go-playground)
+- [ ] [1.116] Custom validator functions
+- [ ] [1.117] gRPC client setup for inter-service calls
+- [ ] [1.118] gRPC server setup with interceptors
+- [ ] [1.119] gRPC health/proto reflection
+- [ ] [1.120] Go Dockerfile (multi-stage, distroless)
+
+## Phase 2: Rust Performance-Critical Services (95 commits)
+
+- [ ] [2.01] Cargo workspace init in src/rust/
+- [ ] [2.02] Rust core crate: reputation-data (shared types)
+- [ ] [2.03] Rust data processing service (Actix/Axum)
+- [ ] [2.04] Health check endpoint (Rust)
+- [ ] [2.05] OpenTelemetry tracing setup (opentelemetry-rs)
+- [ ] [2.06] Structured logging (tracing crate)
+- [ ] [2.07] Apache Arrow integration: in-memory columnar format
+- [ ] [2.08] Apache DataFusion query engine integration
+- [ ] [2.09] Custom DataFusion table provider for reputation data
+- [ ] [2.10] SQL query endpoint via DataFusion
+- [ ] [2.11] Parquet file reader/writer service
+- [ ] [2.12] Parquet to Arrow conversion pipeline
+- [ ] [2.13] DuckDB embedded analytics integration
+- [ ] [2.14] DuckDB query endpoint
+- [ ] [2.15] DuckDB to Arrow zero-copy interchange
+- [ ] [2.16] Apache Iceberg table format integration
+- [ ] [2.17] Iceberg catalog configuration (REST catalog)
+- [ ] [2.18] Iceberg table creation and management
+- [ ] [2.19] Iceberg time-travel query support
+- [ ] [2.20] Iceberg compaction service
+- [ ] [2.21] Trino federated query client
+- [ ] [2.22] Trino query submission and result fetching
+- [ ] [2.23] LanceDB vector store integration (Rust SDK)
+- [ ] [2.24] LanceDB table creation (multimodal)
+- [ ] [2.25] LanceDB vector + metadata hybrid search
+- [ ] [2.26] Qdrant vector DB client (Rust SDK)
+- [ ] [2.27] Qdrant collection management
+- [ ] [2.28] Qdrant vector upsert and search
+- [ ] [2.29] Qdrant payload filtering
+- [ ] [2.30] Cryptographic operations service (ed25519, blake3)
+- [ ] [2.31] Zero-knowledge proof primitives (zk-SNARKs)
+- [ ] [2.32] Merkle tree implementation for credential proofs
+- [ ] [2.33] Digital signature verification pipeline
+- [ ] [2.34] Hash-based credential anonymization
+- [ ] [2.35] High-throughput event processing pipeline
+- [ ] [2.36] Event sourcing with append-only logs
+- [ ] [2.37] CQRS split: command vs query paths
+- [ ] [2.38] Event bus integration (NATS/Kafka producer)
+- [ ] [2.39] Event consumer framework
+- [ ] [2.40] Reputation calculation engine (SIMD-optimized)
+- [ ] [2.41] Weighted scoring with parallel computation (rayon)
+- [ ] [2.42] Time-decay reputation algorithm
+- [ ] [2.43] Trust graph traversal (BFS/PageRank)
+- [ ] [2.44] Collaborative filtering for recommendations
+- [ ] [2.45] Anomaly detection in reputation changes
+- [ ] [2.46] Bulk data export service (Parquet/CSV)
+- [ ] [2.47] Bulk data import pipeline
+- [ ] [2.48] Streaming query service (via Arrow Flight)
+- [ ] [2.49] Arrow Flight RPC server setup
+- [ ] [2.50] Flight SQL implementation for SQL-over-Flight
+- [ ] [2.51] Postgres connection pool (sqlx)
+- [ ] [2.52] Redis client (fred-rs)
+- [ ] [2.53] NATS client for event streaming
+- [ ] [2.54] Database migrations (sqlx migrate)
+- [ ] [2.55] Migrations for analytics tables
+- [ ] [2.56] gRPC server (tonic) for inter-service comms
+- [ ] [2.57] gRPC client definitions for Go/Python interop
+- [ ] [2.58] Protobuf service definitions (Rust side)
+- [ ] [2.59] Rate limiting middleware (Rust)
+- [ ] [2.60] Auth middleware (JWT verification)
+- [ ] [2.61] CORS middleware (Rust)
+- [ ] [2.62] Request ID propagation middleware
+- [ ] [2.63] Error handling with thiserror/anyhow
+- [ ] [2.64] Custom error types for each domain
+- [ ] [2.65] Circuit breaker implementation
+- [ ] [2.66] Retry with backoff (backoff crate)
+- [ ] [2.67] Connection pooling configuration
+- [ ] [2.68] Health check endpoint (/healthz, /readyz)
+- [ ] [2.69] Metrics endpoint (prometheus crate)
+- [ ] [2.70] Config management (dotenv + config crate)
+- [ ] [2.71] Feature flags via config
+- [ ] [2.72] Environment-aware configuration
+- [ ] [2.73] Integration tests: Arrow/DataFusion pipeline
+- [ ] [2.74] Integration tests: DuckDB queries
+- [ ] [2.75] Integration tests: Iceberg operations
+- [ ] [2.76] Integration tests: Qdrant operations
+- [ ] [2.77] Integration tests: LanceDB operations
+- [ ] [2.78] Integration tests: cryptographic operations
+- [ ] [2.79] Integration tests: event pipeline
+- [ ] [2.80] Load tests: Rust high-throughput endpoints
+- [ ] [2.81] fuzz testing for cryptographic functions
+- [ ] [2.82] Property-based testing (proptest)
+- [ ] [2.83] Benchmark suite (criterion)
+- [ ] [2.84] Benchmarks: Arrow vs JSON serialization
+- [ ] [2.85] Benchmarks: DuckDB vs Postgres queries
+- [ ] [2.86] Benchmarks: reputation calculation throughput
+- [ ] [2.87] Memory profiling setup
+- [ ] [2.88] CPU profiling setup (pprof-rs)
+- [ ] [2.89] Graceful shutdown (tokio signal handling)
+- [ ] [2.90] Async runtime config (tokio, multi-threaded)
+- [ ] [2.91] Custom tokio task spawn for compute-heavy ops
+- [ ] [2.92] Thread pool for blocking I/O
+- [ ] [2.93] PQC integration (liboqs Rust bindings)
+- [ ] [2.94] Quantum-resistant signature verification
+- [ ] [2.95] Rust Dockerfile (scratch-based, multi-stage)
+
+## Phase 3: Python AI/ML Services (120 commits)
+
+- [ ] [3.01] Python project init (pyproject.toml, poetry/uv)
+- [ ] [3.02] FastAPI application skeleton
+- [ ] [3.03] Health check, metrics, tracing middleware
+- [ ] [3.04] OpenTelemetry Python SDK setup
+- [ ] [3.05] Structured logging (structlog)
+- [ ] [3.06] Pydantic models for AI service layer
+- [ ] [3.07] Auth middleware (JWT, API key)
+- [ ] [3.08] Rate limiting middleware
+- [ ] [3.09] Weights & Biases Weave integration
+- [ ] [3.10] Weave trace initialization for LLM calls
+- [ ] [3.11] Weave dataset creation for evaluations
+- [ ] [3.12] Weave evaluation pipeline (LLM-as-judge)
+- [ ] [3.13] Custom Weave scorer implementation
+- [ ] [3.14] Prompt versioning with Weave
+- [ ] [3.15] Model comparison dashboard setup
+- [ ] [3.16] Ollama client integration
+- [ ] [3.17] Ollama model pull management
+- [ ] [3.18] Ollama chat/completion endpoint proxy
+- [ ] [3.19] Ollama model health monitoring
+- [ ] [3.20] vLLM client integration (OpenAI-compatible)
+- [ ] [3.21] vLLM model deployment management
+- [ ] [3.22] vLLM batch inference pipeline
+- [ ] [3.23] vLLM performance metrics collection
+- [ ] [3.24] SGLang client integration
+- [ ] [3.25] SGLang structured generation (JSON schema)
+- [ ] [3.26] SGLang constrained decoding patterns
+- [ ] [3.27] SGLang RadixAttention cache config
+- [ ] [3.28] llama.cpp server integration
+- [ ] [3.29] llama.cpp model quantization pipeline
+- [ ] [3.30] LM Studio connection for dev/playground
+- [ ] [3.31] Chroma vector DB integration (Python client)
+- [ ] [3.32] Chroma collection management
+- [ ] [3.33] Chroma embedding pipeline
+- [ ] [3.34] Chroma hybrid search configuration
+- [ ] [3.35] Chroma metadata filtering setup
+- [ ] [3.36] Milvus vector DB integration (PyMilvus)
+- [ ] [3.37] Milvus collection schema design
+- [ ] [3.38] Milvus index configuration (IVF_FLAT, HNSW)
+- [ ] [3.39] Milvus partition and shard config
+- [ ] [3.40] Milvus bulk insert pipeline
+- [ ] [3.41] Weaviate vector DB integration
+- [ ] [3.42] Weaviate schema/class definitions
+- [ ] [3.43] Weaviate hybrid search (BM25 + vector)
+- [ ] [3.44] Weaviate generative search integration
+- [ ] [3.45] Weaviate multi-tenancy config
+- [ ] [3.46] Chroma + Qdrant + Milvus + Weaviate unified router
+- [ ] [3.47] Vector DB health check service
+- [ ] [3.48] Vector DB backup/restore automation
+- [ ] [3.49] Reputation embedding generation service
+- [ ] [3.50] Credential embedding pipeline
+- [ ] [3.51] Semantic similarity search for credentials
+- [ ] [3.52] RAG pipeline for reputation queries
+- [ ] [3.53] RAG context retrieval and augmentation
+- [ ] [3.54] RAG prompt template management
+- [ ] [3.55] Hermes Agent integration
+- [ ] [3.56] Hermes agent tool registration
+- [ ] [3.57] Hermes skills for reputation workflows
+- [ ] [3.58] Hermes cron job scheduling
+- [ ] [3.59] Hermes memory/persistence configuration
+- [ ] [3.60] Hermes multi-agent orchestration
+- [ ] [3.61] Agent Skills implementation (MCP-based)
+- [ ] [3.62] Reputation analysis skill (AI-powered)
+- [ ] [3.63] Credential verification skill (automated)
+- [ ] [3.64] Dispute resolution mediation skill
+- [ ] [3.65] Content moderation skill
+- [ ] [3.66] Natural language reputation query endpoint
+- [ ] [3.67] AI-powered moderation (toxicity, spam detection)
+- [ ] [3.68] AI-generated review authenticity scoring
+- [ ] [3.69] Fraud detection ML pipeline
+- [ ] [3.70] Anomaly detection for reputation manipulation
+- [ ] [3.71] Credential summarization with LLM
+- [ ] [3.72] Multi-language support via LLM translation
+- [ ] [3.73] Creator profile enrichment via AI
+- [ ] [3.74] GPT/LLM-assisted onboarding wizard
+- [ ] [3.75] AI recommendation engine for creators
+- [ ] [3.76] Similar creator discovery (vector similarity)
+- [ ] [3.77] Trending topics/attributes extraction
+- [ ] [3.78] Category auto-classification from descriptions
+- [ ] [3.79] Sentiment analysis for reviews
+- [ ] [3.80] Keyword extraction service
+- [ ] [3.81] Async task queue (Celery + Redis/RabbitMQ)
+- [ ] [3.82] Task definitions for AI processing
+- [ ] [3.83] Scheduled periodic tasks
+- [ ] [3.84] Result backend configuration
+- [ ] [3.85] Task monitoring (Flower)
+- [ ] [3.86] Retry and error handling for tasks
+- [ ] [3.87] WebSocket endpoint for real-time AI results
+- [ ] [3.88] SSE streaming for LLM responses
+- [ ] [3.89] File upload service (images, documents)
+- [ ] [3.90] Image processing pipeline (thumbnails, resize)
+- [ ] [3.91] Document parsing (PDF, Word, text extraction)
+- [ ] [3.92] OCR service for document verification
+- [ ] [3.93] Caching layer (Redis, disk-based)
+- [ ] [3.94] Embedding cache to avoid recomputation
+- [ ] [3.95] LLM response cache
+- [ ] [3.96] gRPC client for Rust data service
+- [ ] [3.97] gRPC server for AI service
+- [ ] [3.98] REST-to-gRPC proxy endpoints
+- [ ] [3.99] Health check endpoints
+- [ ] [3.100] Prometheus metrics for AI operations
+- [ ] [3.101] Custom metrics: LLM latency, token usage
+- [ ] [3.102] Custom metrics: Vector DB query latency
+- [ ] [3.103] Custom metrics: embedding throughput
+- [ ] [3.104] Unit tests: Ollama client
+- [ ] [3.105] Unit tests: Vector DB clients
+- [ ] [3.106] Unit tests: RAG pipeline
+- [ ] [3.107] Unit tests: LLM evaluation pipeline
+- [ ] [3.108] Unit tests: AI moderation
+- [ ] [3.109] Integration tests: Weave traces
+- [ ] [3.110] Integration tests: Chroma operations
+- [ ] [3.111] Integration tests: Milvus operations
+- [ ] [3.112] Integration tests: Weaviate operations
+- [ ] [3.113] Integration tests: Hermes agent
+- [ ] [3.114] Integration tests: async tasks
+- [ ] [3.115] Integration tests: LLM endpoints
+- [ ] [3.116] Load tests: vector DB throughput
+- [ ] [3.117] Load tests: LLM serving latency
+- [ ] [3.118] Python Dockerfile (slim, multi-stage)
+- [ ] [3.119] Python dev Dockerfile (with hot-reload)
+- [ ] [3.120] CUDA-enabled Dockerfile for GPU inference
+
+## Phase 4: Julia Analytics Services (50 commits)
+
+- [ ] [4.01] Julia project init (Project.toml, Manifest.toml)
+- [ ] [4.02] Genie/HTTP.jl web service skeleton
+- [ ] [4.03] Health check and metrics endpoint
+- [ ] [4.04] OpenTelemetry integration (Julia)
+- [ ] [4.05] Structured logging (Logging.jl)
+- [ ] [4.06] Reputation statistical analysis service
+- [ ] [4.07] Bayesian reputation scoring implementation
+- [ ] [4.08] Monte Carlo simulation for trust modeling
+- [ ] [4.09] Time-series analysis of reputation trends
+- [ ] [4.10] Statistical anomaly detection for fraud
+- [ ] [4.11] Federated learning simulation for privacy
+- [ ] [4.12] Differential privacy noise injection
+- [ ] [4.13] Homomorphic encryption primitives
+- [ ] [4.14] Linear regression for reputation prediction
+- [ ] [4.15] Clustering algorithms (DBSCAN, k-means)
+- [ ] [4.16] PCA for reputation dimensionality reduction
+- [ ] [4.17] Data visualization service (Plots.jl, Makie.jl)
+- [ ] [4.18] PDF report generation for reputation reports
+- [ ] [4.19] CSV/Parquet file import pipeline
+- [ ] [4.20] DuckDB integration (Julia)
+- [ ] [4.21] Apache Arrow integration (Julia)
+- [ ] [4.22] DataFrames.jl for data manipulation
+- [ ] [4.23] Benchmark comparison with Python/Rust
+- [ ] [4.24] Distributed computing (Distributed.jl, MPI)
+- [ ] [4.25] Multi-threaded reputation computation
+- [ ] [4.26] GPU-accelerated computation (CUDA.jl)
+- [ ] [4.27] Statistical model serialization
+- [ ] [4.28] Model versioning and loading
+- [ ] [4.29] A/B testing statistical evaluation
+- [ ] [4.30] Confidence interval calculation for scores
+- [ ] [4.31] Hypothesis testing for reputation changes
+- [ ] [4.32] Correlation analysis between metrics
+- [ ] [4.33] JSON API endpoints for analysis results
+- [ ] [4.34] gRPC client for other microservices
+- [ ] [4.35] HTTP API client for data fetching
+- [ ] [4.36] Redis client (Julia)
+- [ ] [4.37] Postgres client (LibPQ.jl)
+- [ ] [4.38] S3 client for data lake storage
+- [ ] [4.39] Unit tests: statistical functions
+- [ ] [4.40] Unit tests: Bayesian reputation
+- [ ] [4.41] Unit tests: Monte Carlo simulation
+- [ ] [4.42] Integration tests: data pipeline
+- [ ] [4.43] Integration tests: DuckDB queries
+- [ ] [4.44] Integration tests: API endpoints
+- [ ] [4.45] Benchmark suite for numerical operations
+- [ ] [4.46] Config management (TOML, env)
+- [ ] [4.47] Graceful shutdown handler
+- [ ] [4.48] Dockerfile for Julia service
+- [ ] [4.49] Precompile optimization (SnoopPrecompile)
+- [ ] [4.50] Documentation with Documenter.jl
+
+## Phase 5: QASM + PQC Quantum Services (75 commits)
+
+- [ ] [5.01] QASM project structure (quantum circuits)
+- [ ] [5.02] Quantum random number generator service
+- [ ] [5.03] Quantum key distribution simulation
+- [ ] [5.04] Quantum-resistant signature scheme (FIPS 205)
+- [ ] [5.05] PQC: ML-KEM (FIPS 203) integration
+- [ ] [5.06] PQC: ML-DSA (FIPS 204) integration
+- [ ] [5.07] PQC: SLH-DSA (FIPS 205) integration
+- [ ] [5.08] PQC: FN-DSA (FIPS 206, future) placeholder
+- [ ] [5.09] liboqs Rust/Python bindings for service layer
+- [ ] [5.10] Credential hashing with quantum-resistant methods
+- [ ] [5.11] Hybrid classical-quantum reputation algorithm
+- [ ] [5.12] Quantum state simulation for trust verification
+- [ ] [5.13] Qiskit/QIR integration for future quantum backends
+- [ ] [5.14] Quantum circuit optimization pipeline
+- [ ] [5.15] Quantum noise model simulation
+- [ ] [5.16] Entanglement-based credential linking (conceptual)
+- [ ] [5.17] Quantum token generation for soulbound proofs
+- [ ] [5.18] HTTP API wrapping quantum operations
+- [ ] [5.19] gRPC service for quantum operations
+- [ ] [5.20] Health check for quantum simulator backend
+- [ ] [5.21] OpenQASM 3.0 circuit definitions
+- [ ] [5.22] Quantum gate decomposition utilities
+- [ ] [5.23] Measurement result analysis
+- [ ] [5.24] Unit tests: quantum circuit execution
+- [ ] [5.25] Unit tests: PQC signature verification
+- [ ] [5.26] Integration tests: PQC with Rust crypto
+- [ ] [5.27] Integration tests: QRNG randomness quality
+- [ ] [5.28] Benchmark: classical vs quantum operations
+- [ ] [5.29] Dockerfile for QASM service (with Qiskit)
+- [ ] [5.30] Documentation: quantum security architecture
+- [ ] [5.31] Lattice-based KEM (ML-KEM / FIPS 203) implementation in Rust service
+- [ ] [5.32] Lattice-based signatures (ML-DSA / FIPS 204) for credential signing
+- [ ] [5.33] SPHINCS+ stateless hash-based sig (SLH-DSA / FIPS 205) integration
+- [ ] [5.34] FN-DSA (FALCON / FIPS 206) placeholder and future-proofing
+- [ ] [5.35] Hybrid KEM: X25519 + ML-KEM-768 for forward compatibility
+- [ ] [5.36] Quantum-resistant credential payload encryption (Kyber + AES-256-GCM)
+- [ ] [5.37] Quantum random number generator (QRNG) for passport key material
+- [ ] [5.38] QRNG entropy source validation (NIST SP 800-90B compliance)
+- [ ] [5.39] Entropy mixing: classical TRNG + QRNG for key derivation
+- [ ] [5.40] Lattice-based identity commitment scheme (anonymized credentials)
+- [ ] [5.41] Merkle-tree credential batch verification (quantum-resistant)
+- [ ] [5.42] Hash-based one-time signatures for lightweight credential proofs
+- [ ] [5.43] Quantum-resistant session key establishment protocol
+- [ ] [5.44] Post-quantum credential revocation list (hash-chain based)
+- [ ] [5.45] Lattice-based zero-knowledge proof of reputation (zk-SNARKs)
+- [ ] [5.46] Quantum-resistant audit trail (hash-chain + Dilithium signatures)
+- [ ] [5.47] Harvest-now-decrypt-later (SNDL) mitigation: PQC encrypt all passport data at rest
+- [ ] [5.48] PQC key lifecycle management (generation, rotation, expiration)
+- [ ] [5.49] Hybrid certificate chain: X.509 with RSA + ML-DSA dual certs
+- [ ] [5.50] Quantum-safe firmware signing for edge deployment
+- [ ] [5.51] PQC benchmark suite: keygen, encaps, decaps latency
+- [ ] [5.52] PQC benchmark suite: signature generation and verification
+- [ ] [5.53] PQC benchmark: handshake size comparison (classical vs hybrid vs pure)
+- [ ] [5.54] PQC migration strategy documentation (CNSA 2.0 roadmap)
+- [ ] [5.55] Quantum threat model document (Mosca's theorem analysis)
+- [ ] [5.56] PQC algorithm agility framework (swap algorithms without code change)
+- [ ] [5.57] CRYSTALS-Kyber vs classic ECDH fallback mechanism
+- [ ] [5.58] Dilithium signature batching for batch credential issuance
+- [ ] [5.59] Post-quantum onion encryption for multi-hop reputation proofs
+- [ ] [5.60] Quantum-resistant token binding (OAuth 2.0 DPoP with PQC)
+- [ ] [5.61] Simulated quantum oracle attack tests on credential system
+- [ ] [5.62] liboqs Rust bindings: full PQC provider initialization
+- [ ] [5.63] liboqs CGo bindings for Go services to access PQC
+- [ ] [5.64] liboqs Python bindings for AI service PQC operations
+- [ ] [5.65] QKD simulation service: BB84 protocol implementation
+- [ ] [5.66] QKD key distillation and privacy amplification
+- [ ] [5.67] QKD + PQC hybrid session key derivation
+- [ ] [5.68] Quantum circuit for reputation score commitment (QASM)
+- [ ] [5.69] Grover's algorithm simulation for security parameter validation
+- [ ] [5.70] PQC integration smoke test suite (all algorithms)
+- [ ] [5.71] PQC cross-language interop test (Go↔Rust↔Python signatures)
+- [ ] [5.72] Post-quantum password-authenticated key exchange (PAKE)
+- [ ] [5.73] Quantum-safe hardware security module (HSM) integration stub
+- [ ] [5.74] PQC compliance dashboard (NIST standards coverage map)
+- [ ] [5.75] Quantum-readiness level scoring tool (self-assessment)
+
+## Phase 6: Nginx + PQC Proxy Gateway (65 commits)
+
+- [ ] [6.01] Nginx base configuration structure
+- [ ] [6.02] SSL/TLS termination configuration
+- [ ] [6.03] HTTP/2 and HTTP/3 (QUIC) support
+- [ ] [6.04] Reverse proxy to Kong gateway upstream
+- [ ] [6.05] Reverse proxy to Go API services (direct path)
+- [ ] [6.06] Reverse proxy to Rust data services
+- [ ] [6.07] Reverse proxy to Python AI services
+- [ ] [6.08] Reverse proxy to Julia analytics services
+- [ ] [6.09] Reverse proxy to QASM quantum services
+- [ ] [6.10] Location-based routing configuration
+- [ ] [6.11] Header-based routing (X-Service-Type)
+- [ ] [6.12] Load balancing: round-robin upstream
+- [ ] [6.13] Load balancing: least connections upstream
+- [ ] [6.14] Load balancing: IP hash sticky sessions
+- [ ] [6.15] Rate limiting (limit_req module)
+- [ ] [6.16] Connection limiting (limit_conn module)
+- [ ] [6.17] Request body size limits per service
+- [ ] [6.18] Static file serving for API docs
+- [ ] [6.19] CORS header configuration
+- [ ] [6.20] Security headers (HSTS, CSP, X-Frame-Options)
+- [ ] [6.21] Access log format (JSON structured)
+- [ ] [6.22] Error log configuration with levels
+- [ ] [6.23] Log rotation and shipping (syslog)
+- [ ] [6.24] Custom error pages (401, 403, 404, 500)
+- [ ] [6.25] Health check proxy_pass to backend healthz
+- [ ] [6.26] Passive health checks (max_fails, fail_timeout)
+- [ ] [6.27] Active health checks (nginx-plus, or custom)
+- [ ] [6.28] WebSocket proxy configuration
+- [ ] [6.29] gRPC passthrough via nginx
+- [ ] [6.30] gRPC TLS configuration
+- [ ] [6.31] Client certificate authentication (mTLS)
+- [ ] [6.32] geoip module for location-based rules
+- [ ] [6.33] map module for conditional routing
+- [ ] [6.34] Real IP module for correct client IP
+- [ ] [6.35] Cache configuration for static assets
+- [ ] [6.36] Proxy cache for API responses
+- [ ] [6.37] Cache purge/invalidation endpoint
+- [ ] [6.38] nginx.conf template with environment vars
+- [ ] [6.39] Nginx Dockerfile (distroless)
+- [ ] [6.40] Nginx ConfigMap for K8s deployment
+- [ ] [6.41] OpenSSL 3.x + oqs-provider compilation (liboqs + provider build)
+- [ ] [6.42] Nginx custom build linked against PQC-enabled OpenSSL 3
+- [ ] [6.43] oqs-provider shared library deployment in Nginx container
+- [ ] [6.44] Hybrid PQC TLS 1.3 key exchange config (X25519+MLKEM768)
+- [ ] [6.45] Pure PQC TLS 1.3 groups (ML-KEM-512, ML-KEM-768, ML-KEM-1024)
+- [ ] [6.46] Nginx ssl_ecdh_curve directive with PQC groups
+- [ ] [6.47] PQC certificate generation: ML-DSA-44 self-signed CA
+- [ ] [6.48] PQC certificate generation: ML-DSA-65 server certificate
+- [ ] [6.49] PQC certificate generation: ML-DSA-87 high-security certificate
+- [ ] [6.50] Dual-stack certificates: RSA-2048 + ML-DSA-65 in same chain
+- [ ] [6.51] Nginx ssl_certificate with hybrid PQC chain
+- [ ] [6.52] PQC TLS cipher suite configuration in nginx.conf
+- [ ] [6.53] PQC TLS protocol negotiation testing (OpenSSL s_client)
+- [ ] [6.54] PQC handshake latency benchmark vs classical TLS
+- [ ] [6.55] PQC handshake size monitoring and alerting
+- [ ] [6.56] PQC fallback mechanism: hybrid → classical → reject
+- [ ] [6.57] Nginx PQC client certificate verification (ML-DSA)
+- [ ] [6.58] Client-cert mTLS with Dilithium signatures
+- [ ] [6.59] PQC OCSP stapling configuration
+- [ ] [6.60] PQC session ticket encryption (PQC KEM)
+- [ ] [6.61] Nginx PQC readiness health check endpoint
+- [ ] [6.62] PQC performance tuning: ssl_buffer_size, ssl_session_cache
+- [ ] [6.63] Nginx PQC cipher priority ordering
+- [ ] [6.64] Grafana dashboard: PQC vs classical handshake metrics
+- [ ] [6.65] PQC TLS 1.3 interop test with major browsers/curl
+
+## Phase 7: Kong AI Gateway (60 commits)
+
+- [ ] [7.01] Kong Gateway installation and config directory
+- [ ] [7.02] Kong declarative config (kong.yml / decK)
+- [ ] [7.03] Kong database bootstrap (Postgres)
+- [ ] [7.04] Kong service definition for Go API
+- [ ] [7.05] Kong service definition for Rust data
+- [ ] [7.06] Kong service definition for Python AI
+- [ ] [7.07] Kong service definition for Julia analytics
+- [ ] [7.08] Kong service definition for QASM quantum
+- [ ] [7.09] Kong route configuration for all services
+- [ ] [7.10] Kong upstream health checks
+- [ ] [7.11] Kong load balancing configuration
+- [ ] [7.12] Kong rate limiting plugin (per-service)
+- [ ] [7.13] Kong rate limiting plugin (per-consumer)
+- [ ] [7.14] Kong rate limiting plugin (sliding window)
+- [ ] [7.15] Kong key authentication plugin
+- [ ] [7.16] Kong JWT authentication plugin
+- [ ] [7.17] Kong OAuth2 authentication plugin
+- [ ] [7.18] Kong basic auth plugin
+- [ ] [7.19] Kong ACL plugin (RBAC)
+- [ ] [7.20] Kong IP restriction plugin
+- [ ] [7.21] Kong CORS plugin configuration
+- [ ] [7.22] Kong request transformer plugin
+- [ ] [7.23] Kong response transformer plugin
+- [ ] [7.24] Kong proxy cache plugin
+- [ ] [7.25] Kong file log plugin (access logs)
+- [ ] [7.26] Kong syslog plugin
+- [ ] [7.27] Kong statsd plugin (metrics to Prometheus)
+- [ ] [7.28] Kong Prometheus metrics endpoint
+- [ ] [7.29] Kong datadog plugin
+- [ ] [7.30] Kong zipkin/OpenTelemetry tracing plugin
+- [ ] [7.31] Kong AI proxy plugin configuration
+- [ ] [7.32] Kong AI proxy: LLM provider routing
+- [ ] [7.33] Kong AI proxy: prompt templating
+- [ ] [7.34] Kong AI proxy: model fallback chain
+- [ ] [7.35] Kong AI proxy: request/response logging
+- [ ] [7.36] Kong AI rate limiting (token-based)
+- [ ] [7.37] Kong AI content moderation plugin
+- [ ] [7.38] Kong AI semantic caching
+- [ ] [7.39] Kong request size limiting plugin
+- [ ] [7.40] Kong bot detection plugin
+- [ ] [7.41] Kong custom plugin development (Lua)
+- [ ] [7.42] Custom plugin: reputation scoring header
+- [ ] [7.43] Custom plugin: audit logging enrichment
+- [ ] [7.44] Custom plugin: request validation
+- [ ] [7.45] decK state management and CI integration
+- [ ] [7.46] Kong Admin API security (RBAC)
+- [ ] [7.47] Kong Manager GUI setup
+- [ ] [7.48] Kong Developer Portal setup
+- [ ] [7.49] Kong service-level consumer management
+- [ ] [7.50] Kong plugin ordering and priority config
+- [ ] [7.51] Kong upstream TLS/mTLS configuration
+- [ ] [7.52] Kong certificate management (SNI)
+- [ ] [7.53] Kong hybrid mode (control plane + data plane)
+- [ ] [7.54] Kong DB-less mode configuration (for K8s)
+- [ ] [7.55] Kong ingress controller for K8s
+- [ ] [7.56] Kong Dockerfile / official image
+- [ ] [7.57] Kong docker-compose service definition
+- [ ] [7.58] Kong Helm chart values customization
+- [ ] [7.59] Kong backup/restore of declarative config
+- [ ] [7.60] Kong performance tuning (worker count, buffer)
+
+## Phase 8: Docker Containerization (80 commits)
+
+- [ ] [8.01] Root docker-compose.yml — all services
+- [ ] [8.02] docker-compose.override.yml (dev overrides)
+- [ ] [8.03] docker-compose.monitoring.yml (observability stack)
+- [ ] [8.04] docker-compose.ai.yml (AI services)
+- [ ] [8.05] docker-compose.vector-db.yml (all vector DBs)
+- [ ] [8.06] docker-compose.data.yml (data infrastructure)
+- [ ] [8.07] Go service Dockerfile (distroless, multi-stage)
+- [ ] [8.08] Go dev Dockerfile (with hot-reload via air)
+- [ ] [8.09] Rust service Dockerfile (scratch-based)
+- [ ] [8.10] Rust dev Dockerfile (with cargo-watch)
+- [ ] [8.11] Python AI service Dockerfile (slim-bullseye)
+- [ ] [8.12] Python dev Dockerfile (with uvicorn --reload)
+- [ ] [8.13] Python GPU Dockerfile (CUDA 12.x base)
+- [ ] [8.14] Julia service Dockerfile
+- [ ] [8.15] QASM service Dockerfile
+- [ ] [8.16] Nginx Dockerfile
+- [ ] [8.17] Kong Dockerfile / custom image
+- [ ] [8.18] Docker .dockerignore files per service
+- [ ] [8.19] Docker layer caching optimization
+- [ ] [8.20] Docker build args for env-specific config
+- [ ] [8.21] Docker volumes: Postgres data
+- [ ] [8.22] Docker volumes: Redis data
+- [ ] [8.23] Docker volumes: Vector DB data
+- [ ] [8.24] Docker volumes: MinIO data
+- [ ] [8.25] Docker volumes: shared config
+- [ ] [8.26] Docker networks: frontend network
+- [ ] [8.27] Docker networks: backend network
+- [ ] [8.28] Docker networks: data network
+- [ ] [8.29] Docker networks: AI network
+- [ ] [8.30] Docker healthcheck directives per service
+- [ ] [8.31] Docker restart policies
+- [ ] [8.32] Docker resource limits (CPU, memory)
+- [ ] [8.33] Docker security options (no-new-privileges)
+- [ ] [8.34] Docker read-only root filesystem (where possible)
+- [ ] [8.35] Docker secrets management (docker secret)
+- [ ] [8.36] Docker environment file (.env references)
+- [ ] [8.37] Multi-stage build pattern: builder stage
+- [ ] [8.38] Multi-stage build pattern: test stage
+- [ ] [8.39] Multi-stage build pattern: runtime stage
+- [ ] [8.40] Docker build CI: image tagging strategy
+- [ ] [8.41] Docker build CI: cache-from optimization
+- [ ] [8.42] Docker build CI: parallel builds
+- [ ] [8.43] Docker Compose profiles (dev, test, staging, prod)
+- [ ] [8.44] Docker Compose depends_on with healthcheck
+- [ ] [8.45] Docker Compose scale configuration
+- [ ] [8.46] Docker Compose deploy section (swarm)
+- [ ] [8.47] Docker registry: GitHub Container Registry
+- [ ] [8.48] Docker registry: Docker Hub
+- [ ] [8.49] Docker registry: private registry setup
+- [ ] [8.50] Docker image vulnerability scanning (Trivy)
+- [ ] [8.51] Docker SBOM generation for each image
+- [ ] [8.52] Docker Content Trust (DCT) signing
+- [ ] [8.53] Docker login CI helper
+- [ ] [8.54] Makefile targets: docker-build, docker-push
+- [ ] [8.55] Makefile targets: docker-up, docker-down
+- [ ] [8.56] Makefile targets: docker-logs, docker-exec
+- [ ] [8.57] Postgres Docker configuration (custom image)
+- [ ] [8.58] Postgres init scripts (extensions, users)
+- [ ] [8.59] Postgres Docker healthcheck
+- [ ] [8.60] Redis Docker configuration (custom)
+- [ ] [8.61] Redis Docker healthcheck
+- [ ] [8.62] MinIO Docker (S3-compatible storage)
+- [ ] [8.63] MinIO bucket initialization script
+- [ ] [8.64] NATS Docker (event streaming)
+- [ ] [8.65] NATS Docker configuration
+- [ ] [8.66] Chroma Docker service definition
+- [ ] [8.67] Milvus Docker: standalone mode
+- [ ] [8.68] Weaviate Docker service definition
+- [ ] [8.69] Qdrant Docker service definition
+- [ ] [8.70] Ollama Docker: GPU support
+- [ ] [8.71] Ollama Docker: model download on startup
+- [ ] [8.72] vLLM Docker: GPU support
+- [ ] [8.73] Prometheus Docker configuration
+- [ ] [8.74] Grafana Docker with dashboards
+- [ ] [8.75] OpenTelemetry Collector Docker
+- [ ] [8.76] Container security: non-root user setup
+- [ ] [8.77] Container security: capability dropping
+- [ ] [8.78] Container security: seccomp profile
+- [ ] [8.79] Container security: AppArmor profile
+- [ ] [8.80] Docker compose validation in CI
+
+## Phase 9: Kubernetes Orchestration (110 commits)
+
+- [ ] [9.01] K8s directory structure (k8s/ namespaces)
+- [ ] [9.02] K8s namespace definitions per environment
+- [ ] [9.03] K8s RBAC: ServiceAccount definitions
+- [ ] [9.04] K8s RBAC: Role definitions
+- [ ] [9.05] K8s RBAC: RoleBinding definitions
+- [ ] [9.06] K8s ConfigMap: nginx configuration
+- [ ] [9.07] K8s ConfigMap: Go API configuration
+- [ ] [9.08] K8s ConfigMap: Rust data service config
+- [ ] [9.09] K8s ConfigMap: Python AI config
+- [ ] [9.10] K8s ConfigMap: Julia analytics config
+- [ ] [9.11] K8s ConfigMap: Kong declarative config
+- [ ] [9.12] K8s Secret: Postgres credentials
+- [ ] [9.13] K8s Secret: Redis credentials
+- [ ] [9.14] K8s Secret: JWT signing keys
+- [ ] [9.15] K8s Secret: API keys for external services
+- [ ] [9.16] K8s Secret: TLS certificates
+- [ ] [9.17] K8s Secret: OAuth2 client secrets
+- [ ] [9.18] External Secrets Operator integration
+- [ ] [9.19] Vault integration via CSI provider
+- [ ] [9.20] K8s Deployment: Go API service (3 replicas)
+- [ ] [9.21] K8s Deployment: Rust data service (3 replicas)
+- [ ] [9.22] K8s Deployment: Python AI service (2 replicas)
+- [ ] [9.23] K8s Deployment: Julia analytics (2 replicas)
+- [ ] [9.24] K8s Deployment: QASM service (1 replica)
+- [ ] [9.25] K8s Deployment: Nginx (2 replicas)
+- [ ] [9.26] K8s Deployment: Kong (2 replicas)
+- [ ] [9.27] K8s StatefulSet: Postgres (primary + replica)
+- [ ] [9.28] K8s StatefulSet: Redis cluster
+- [ ] [9.29] K8s StatefulSet: Chroma
+- [ ] [9.30] K8s StatefulSet: Qdrant cluster
+- [ ] [9.31] K8s StatefulSet: Milvus (standalone)
+- [ ] [9.32] K8s StatefulSet: Weaviate
+- [ ] [9.33] K8s StatefulSet: MinIO
+- [ ] [9.34] K8s StatefulSet: NATS cluster
+- [ ] [9.35] K8s DaemonSet: Cilium (eBPF + networking)
+- [ ] [9.36] K8s DaemonSet: Prometheus node exporter
+- [ ] [9.37] K8s Service: Go API ClusterIP
+- [ ] [9.38] K8s Service: Rust data ClusterIP
+- [ ] [9.39] K8s Service: Python AI ClusterIP
+- [ ] [9.40] K8s Service: Julia analytics ClusterIP
+- [ ] [9.41] K8s Service: QASM ClusterIP
+- [ ] [9.42] K8s Service: Nginx LoadBalancer
+- [ ] [9.43] K8s Service: Kong LoadBalancer
+- [ ] [9.44] K8s Service: Postgres ClusterIP (headless)
+- [ ] [9.45] K8s Service: Redis ClusterIP (headless)
+- [ ] [9.46] K8s Service: Chroma ClusterIP
+- [ ] [9.47] K8s Service: Qdrant ClusterIP
+- [ ] [9.48] K8s Service: Milvus ClusterIP
+- [ ] [9.49] K8s Service: Weaviate ClusterIP
+- [ ] [9.50] K8s Service: MinIO ClusterIP
+- [ ] [9.51] K8s Service: NATS ClusterIP (headless)
+- [ ] [9.52] K8s Ingress: Nginx IngressController setup
+- [ ] [9.53] K8s Ingress: TLS configuration (cert-manager)
+- [ ] [9.54] K8s Ingress: path-based routing rules
+- [ ] [9.55] K8s Ingress: Kong IngressController setup
+- [ ] [9.56] K8s NetworkPolicy: deny-all baseline
+- [ ] [9.57] K8s NetworkPolicy: allow-ingress-from-nginx
+- [ ] [9.58] K8s NetworkPolicy: allow-service-mesh
+- [ ] [9.59] K8s NetworkPolicy: allow-monitoring
+- [ ] [9.60] K8s NetworkPolicy: egress restrictions
+- [ ] [9.61] K8s PodDisruptionBudget: Go API (min 2)
+- [ ] [9.62] K8s PodDisruptionBudget: Rust data (min 2)
+- [ ] [9.63] K8s PodDisruptionBudget: Postgres (min 1)
+- [ ] [9.64] K8s PodDisruptionBudget: Redis (min 2)
+- [ ] [9.65] K8s HorizontalPodAutoscaler: Go API
+- [ ] [9.66] K8s HorizontalPodAutoscaler: Rust data
+- [ ] [9.67] K8s HorizontalPodAutoscaler: Python AI
+- [ ] [9.68] K8s HorizontalPodAutoscaler: Nginx
+- [ ] [9.69] K8s HorizontalPodAutoscaler: Kong
+- [ ] [9.70] K8s VerticalPodAutoscaler for stateful workloads
+- [ ] [9.71] K8s ResourceQuota per namespace
+- [ ] [9.72] K8s LimitRange per namespace
+- [ ] [9.73] K8s PriorityClass for critical workloads
+- [ ] [9.74] K8s PersistentVolumeClaim: Postgres
+- [ ] [9.75] K8s PersistentVolumeClaim: Redis
+- [ ] [9.76] K8s PersistentVolumeClaim: Vector DBs
+- [ ] [9.77] K8s PersistentVolumeClaim: MinIO
+- [ ] [9.78] K8s StorageClass configuration (SSD, HDD, NVMe)
+- [ ] [9.79] K8s CronJob: certificate renewal
+- [ ] [9.80] K8s CronJob: database backup
+- [ ] [9.81] K8s CronJob: log rotation/archive
+- [ ] [9.82] K8s CronJob: data compaction (Iceberg)
+- [ ] [9.83] K8s CronJob: vector index optimization
+- [ ] [9.84] K8s Job: database migration
+- [ ] [9.85] K8s Job: seed data initialization
+- [ ] [9.86] K8s CiliumNetworkPolicy for eBPF security
+- [ ] [9.87] K8s CiliumClusterwideNetworkPolicy
+- [ ] [9.88] K8s monitoring: Prometheus Operator
+- [ ] [9.89] K8s monitoring: Grafana Operator
+- [ ] [9.90] K8s monitoring: ServiceMonitor definitions
+- [ ] [9.91] K8s monitoring: PodMonitor definitions
+- [ ] [9.92] K8s monitoring: PrometheusRule (alerting)
+- [ ] [9.93] K8s monitoring: GrafanaDashboard (configmap)
+- [ ] [9.94] K8s logging: OpenTelemetry Collector DaemonSet
+- [ ] [9.95] K8s logging: FluentBit DaemonSet
+- [ ] [9.96] K8s logging: Loki stack (if self-hosted)
+- [ ] [9.97] K8s cert-manager: ClusterIssuer (Let's Encrypt)
+- [ ] [9.98] K8s cert-manager: Certificate resources
+- [ ] [9.99] K8s cert-manager: mTLS setup with istio or linkerd
+- [ ] [9.100] K8s Keda: scaled objects based on queue depth
+- [ ] [9.101] K8s Keda: scaled objects based on Prometheus
+- [ ] [9.102] K8s topology spread constraints
+- [ ] [9.103] K8s node affinity and anti-affinity rules
+- [ ] [9.104] K8s taint tolerations for GPU nodes
+- [ ] [9.105] K8s Windows node support (if needed)
+- [ ] [9.106] K8s cluster autoscaler configuration
+- [ ] [9.107] K8s descheduler for pod rebalancing
+- [ ] [9.108] K8s backup: Velero for cluster backup
+- [ ] [9.109] K8s disaster recovery plan documentation
+- [ ] [9.110] K8s conformance tests (sonobuoy)
+
+## Phase 10: Docker Swarm Orchestration (60 commits)
+
+- [ ] [10.01] Docker Swarm directory structure
+- [ ] [10.02] Swarm init script with manager nodes
+- [ ] [10.03] Swarm worker join token generation
+- [ ] [10.04] Swarm overlay network: frontend
+- [ ] [10.05] Swarm overlay network: backend
+- [ ] [10.06] Swarm overlay network: data
+- [ ] [10.07] Swarm overlay network: AI
+- [ ] [10.08] Swarm service: Go API (replicas: 3)
+- [ ] [10.09] Swarm service: Rust data (replicas: 3)
+- [ ] [10.10] Swarm service: Python AI (replicas: 2)
+- [ ] [10.11] Swarm service: Julia analytics (replicas: 2)
+- [ ] [10.12] Swarm service: QASM (replicas: 1)
+- [ ] [10.13] Swarm service: Nginx (replicas: 3)
+- [ ] [10.14] Swarm service: Kong (replicas: 2)
+- [ ] [10.15] Swarm service: Postgres (replicated mode)
+- [ ] [10.16] Swarm service: Redis (replicated mode)
+- [ ] [10.17] Swarm service: Chroma
+- [ ] [10.18] Swarm service: Qdrant
+- [ ] [10.19] Swarm service: Milvus
+- [ ] [10.20] Swarm service: Weaviate
+- [ ] [10.21] Swarm service: MinIO (distributed mode)
+- [ ] [10.22] Swarm service: NATS cluster
+- [ ] [10.23] Swarm service: Prometheus
+- [ ] [10.24] Swarm service: Grafana
+- [ ] [10.25] Swarm service: OpenTelemetry Collector
+- [ ] [10.26] Swarm secrets: database credentials
+- [ ] [10.27] Swarm secrets: TLS certificates
+- [ ] [10.28] Swarm secrets: API keys
+- [ ] [10.29] Swarm configs: nginx.conf
+- [ ] [10.30] Swarm configs: kong.yml
+- [ ] [10.31] Swarm configs: prometheus.yml
+- [ ] [10.32] Swarm labels for service discovery
+- [ ] [10.33] Swarm placement constraints (node labels)
+- [ ] [10.34] Swarm placement: GPU nodes for AI
+- [ ] [10.35] Swarm placement: SSD nodes for databases
+- [ ] [10.36] Swarm resource reservations and limits
+- [ ] [10.37] Swarm health check policies
+- [ ] [10.38] Swarm update config (rolling, parallelism)
+- [ ] [10.39] Swarm rollback config (failure action)
+- [ ] [10.40] Swarm restart policies
+- [ ] [10.41] Swarm logging driver (json-file, journald)
+- [ ] [10.42] Swarm log rotation configuration
+- [ ] [10.43] Swarm metrics: docker stats + prometheus
+- [ ] [10.44] Swarm service scaling commands (Makefile)
+- [ ] [10.45] Swarm node management scripts
+- [ ] [10.46] Swarm backup: volumes backup script
+- [ ] [10.47] Swarm disaster recovery playbook
+- [ ] [10.48] Swarm-to-K8s migration plan documented
+- [ ] [10.49] Swarm TLS: internal mTLS setup
+- [ ] [10.50] Swarm firewall rules per node
+- [ ] [10.51] Swarm monitoring: dockprom integration
+- [ ] [10.52] Swarm auto-scaling with custom scripts
+- [ ] [10.53] Swarm deployment CI/CD stage
+- [ ] [10.54] Swarm integration tests
+- [ ] [10.55] Swarm load tests (locust/docker swarm)
+- [ ] [10.56] Swarm security: non-root container enforcement
+- [ ] [10.57] Swarm security: read-only filesystem enforcement
+- [ ] [10.58] Swarm security: capability dropping
+- [ ] [10.59] Swarm security: image scanning pre-deploy
+- [ ] [10.60] Swarm documentation (architecture, ops runbook)
+
+## Phase 11: Helm Charts (55 commits)
+
+- [ ] [11.01] Helm chart: project structure conventions
+- [ ] [11.02] Helm chart: go-api (deployment, service, hpa)
+- [ ] [11.03] Helm chart: rust-data (deployment, service, hpa)
+- [ ] [11.04] Helm chart: python-ai (deployment, service, hpa)
+- [ ] [11.05] Helm chart: julia-analytics (deployment, service)
+- [ ] [11.06] Helm chart: qasm-service (deployment, service)
+- [ ] [11.07] Helm chart: nginx (deployment, service, configmap)
+- [ ] [11.08] Helm chart: kong (deployment, service, configmap)
+- [ ] [11.09] Helm chart: postgres (statefulset, service, pvc)
+- [ ] [11.10] Helm chart: redis (statefulset, service, pvc)
+- [ ] [11.11] Helm chart: chroma (statefulset, service, pvc)
+- [ ] [11.12] Helm chart: qdrant (statefulset, service, pvc)
+- [ ] [11.13] Helm chart: milvus (statefulset, service, pvc)
+- [ ] [11.14] Helm chart: weaviate (statefulset, service, pvc)
+- [ ] [11.15] Helm chart: minio (statefulset, service, pvc)
+- [ ] [11.16] Helm chart: nats (statefulset, service, pvc)
+- [ ] [11.17] Helm chart: prometheus (kube-prometheus-stack values)
+- [ ] [11.18] Helm chart: grafana (custom dashboards)
+- [ ] [11.19] Helm chart: opentelemetry-collector
+- [ ] [11.20] Helm chart: cert-manager values
+- [ ] [11.21] Helm chart: external-secrets values
+- [ ] [11.22] Helm chart: cilium values (networking + security)
+- [ ] [11.23] Helm chart: kong-ingress (ingress controller)
+- [ ] [11.24] Helm chart: nginx-ingress (ingress controller)
+- [ ] [11.25] Helm parent chart: umbrella chart for all services
+- [ ] [11.26] Helm values: dev.yaml (low resources, single replica)
+- [ ] [11.27] Helm values: staging.yaml
+- [ ] [11.28] Helm values: prod.yaml (HA, multi-replica)
+- [ ] [11.29] Helm values: on-prem.yaml (local PV, node IP)
+- [ ] [11.30] Helm values: cloud.yaml (cloud LB, managed DB)
+- [ ] [11.31] Helm global values: image registry, pull secrets
+- [ ] [11.32] Helm global values: environment labels
+- [ ] [11.33] Helm hooks: pre-install migration job
+- [ ] [11.34] Helm hooks: post-install seed data
+- [ ] [11.35] Helm hooks: pre-upgrade backup
+- [ ] [11.36] Helm hooks: post-upgrade verification
+- [ ] [11.37] Helm dependency management (Chart.yaml deps)
+- [ ] [11.38] Helm template helpers (common labels, names)
+- [ ] [11.39] Helm _helpers.tpl: service names, selectors
+- [ ] [11.40] Helm notes.txt per chart
+- [ ] [11.41] Helm lifecycle hooks (preStop, postStart)
+- [ ] [11.42] Helm tests (helm test pods)
+- [ ] [11.43] Helm chart testing (helm unittest, ct)
+- [ ] [11.44] Helm linting in CI
+- [ ] [11.45] Helm template rendering validation
+- [ ] [11.46] Helm secrets plugin (helm-secrets / sops)
+- [ ] [11.47] Helm diff plugin for review (helm-diff)
+- [ ] [11.48] Helm registry: OCI-based chart storage
+- [ ] [11.49] Helm chart versioning strategy
+- [ ] [11.50] Helm release management script
+- [ ] [11.51] Helm rollback procedure
+- [ ] [11.52] Helm CI: automatic chart publishing
+- [ ] [11.53] Helm CI: dependency update automation
+- [ ] [11.54] Helm docs: README per chart (helm-docs)
+- [ ] [11.55] Helm upgrade test (simulate prod upgrade)
+
+## Phase 12: Terraform Infrastructure as Code (85 commits)
+
+- [ ] [12.01] Terraform directory structure (environments, modules)
+- [ ] [12.02] Terraform backend: S3 + DynamoDB (state locking)
+- [ ] [12.03] Terraform backend: Consul (for on-prem)
+- [ ] [12.04] Terraform provider: AWS setup
+- [ ] [12.05] Terraform provider: GCP setup
+- [ ] [12.06] Terraform provider: Azure setup
+- [ ] [12.07] Terraform provider: Kubernetes
+- [ ] [12.08] Terraform provider: Helm
+- [ ] [12.09] Terraform provider: Kong (service config)
+- [ ] [12.10] Terraform provider: Cloudflare (DNS)
+- [ ] [12.11] Terraform provider: Random (secrets generation)
+- [ ] [12.12] Terraform provider: TLS (certificate generation)
+- [ ] [12.13] Module: VPC (AWS) + VPC (GCP) + VNet (Azure)
+- [ ] [12.14] Module: subnets (public, private, data)
+- [ ] [12.15] Module: security groups / firewall rules
+- [ ] [12.16] Module: EKS cluster (AWS)
+- [ ] [12.17] Module: GKE cluster (GCP)
+- [ ] [12.18] Module: AKS cluster (Azure)
+- [ ] [12.19] Module: node groups (general, GPU, storage)
+- [ ] [12.20] Module: node auto-scaling configuration
+- [ ] [12.21] Module: RDS Postgres (AWS)
+- [ ] [12.22] Module: Cloud SQL Postgres (GCP)
+- [ ] [12.23] Module: Azure Database for Postgres
+- [ ] [12.24] Module: ElastiCache Redis (AWS)
+- [ ] [12.25] Module: Memorystore Redis (GCP)
+- [ ] [12.26] Module: Azure Cache for Redis
+- [ ] [12.27] Module: S3 buckets + lifecycle policies
+- [ ] [12.28] Module: GCS buckets + lifecycle policies
+- [ ] [12.29] Module: Azure Blob Storage
+- [ ] [12.30] Module: ECR repositories (AWS)
+- [ ] [12.31] Module: GCR/Artifact Registry (GCP)
+- [ ] [12.32] Module: ACR (Azure)
+- [ ] [12.33] Module: IAM roles and policies
+- [ ] [12.34] Module: service accounts (K8s)
+- [ ] [12.35] Module: route53 DNS zones (AWS)
+- [ ] [12.36] Module: Cloud DNS zones (GCP)
+- [ ] [12.37] Module: Azure DNS zones
+- [ ] [12.38] Module: ACM certificates (AWS)
+- [ ] [12.39] Module: load balancer (NLB/ALB)
+- [ ] [12.40] Module: WAF (AWS WAF, Cloud Armor)
+- [ ] [12.41] Module: EFS / Filestore (shared storage)
+- [ ] [12.42] Module: NAT gateway
+- [ ] [12.43] Module: VPN (site-to-site for hybrid)
+- [ ] [12.44] Module: Direct Connect / ExpressRoute
+- [ ] [12.45] Module: Bastion host (jump box)
+- [ ] [12.46] Terraform workspaces: dev
+- [ ] [12.47] Terraform workspaces: staging
+- [ ] [12.48] Terraform workspaces: prod
+- [ ] [12.49] Terraform workspaces: on-prem
+- [ ] [12.50] Terraform variables: global.tfvars
+- [ ] [12.51] Terraform variables: dev.tfvars
+- [ ] [12.52] Terraform variables: staging.tfvars
+- [ ] [12.53] Terraform variables: prod.tfvars
+- [ ] [12.54] Terraform variables: on-prem.tfvars
+- [ ] [12.55] Terraform remote state data sources
+- [ ] [12.56] Terraform import scripts for existing infra
+- [ ] [12.57] Terraform data sources: available AZs, regions
+- [ ] [12.58] Terraform outputs: cluster endpoints
+- [ ] [12.59] Terraform outputs: database connection strings
+- [ ] [12.60] Terraform outputs: bucket names
+- [ ] [12.61] Terraform outputs: DNS names
+- [ ] [12.62] Terraform locals: common tags
+- [ ] [12.63] Terraform locals: name prefixes
+- [ ] [12.64] Terraform plan CI check (pull request)
+- [ ] [12.65] Terraform apply CI/CD stage
+- [ ] [12.66] Terraform destroy protection (prevent destroy)
+- [ ] [12.67] Terraform state management commands (Makefile)
+- [ ] [12.68] Terraform lock file (.terraform.lock.hcl)
+- [ ] [12.69] Terraform version constraints
+- [ ] [12.70] Terraform provider version pinning
+- [ ] [12.71] Terragrunt configuration for DRY modules
+- [ ] [12.72] Terragrunt: remote state configuration
+- [ ] [12.73] Terragrunt: dependency management
+- [ ] [12.74] Terragrunt: include root config
+- [ ] [12.75] Terraform module registry (private)
+- [ ] [12.76] Terraform testing: tflint
+- [ ] [12.77] Terraform testing: tfsec (security scanning)
+- [ ] [12.78] Terraform testing: checkov (compliance)
+- [ ] [12.79] Terraform testing: terratest (integration)
+- [ ] [12.80] On-prem module: bare metal provisioning
+- [ ] [12.81] On-prem module: local storage
+- [ ] [12.82] On-prem module: network (VLAN, BGP)
+- [ ] [12.83] Hybrid module: VPC peering / VPN connection
+- [ ] [12.84] Hybrid module: DNS resolution (Route53 + internal)
+- [ ] [12.85] Documentation: Terraform architecture and workflows
+
+## Phase 13: Pulumi Infrastructure as Code (70 commits)
+
+- [ ] [13.01] Pulumi project structure (stacks, programs)
+- [ ] [13.02] Pulumi state backend (S3, Azure Blob, local)
+- [ ] [13.03] Pulumi ESC (Environments, Secrets, Config)
+- [ ] [13.04] Pulumi program: AWS infrastructure (TypeScript/Go)
+- [ ] [13.05] Pulumi program: GCP infrastructure
+- [ ] [13.06] Pulumi program: Azure infrastructure
+- [ ] [13.07] Pulumi program: Kubernetes cluster (EKS)
+- [ ] [13.08] Pulumi program: Kubernetes cluster (GKE)
+- [ ] [13.09] Pulumi program: Kubernetes cluster (AKS)
+- [ ] [13.10] Pulumi program: K8s deployments (crosswalk)
+- [ ] [13.11] Pulumi component: VPC/subnets
+- [ ] [13.12] Pulumi component: security groups
+- [ ] [13.13] Pulumi component: RDS Postgres
+- [ ] [13.14] Pulumi component: ElastiCache Redis
+- [ ] [13.15] Pulumi component: S3 buckets
+- [ ] [13.16] Pulumi component: ECR repositories
+- [ ] [13.17] Pulumi component: IAM roles
+- [ ] [13.18] Pulumi component: DNS zones
+- [ ] [13.19] Pulumi component: load balancers
+- [ ] [13.20] Pulumi component: certificate management
+- [ ] [13.21] Pulumi component: WAF rules
+- [ ] [13.22] Pulumi component: on-premises resources
+- [ ] [13.23] Pulumi stack: dev configuration
+- [ ] [13.24] Pulumi stack: staging configuration
+- [ ] [13.25] Pulumi stack: prod configuration
+- [ ] [13.26] Pulumi stack: on-prem configuration
+- [ ] [13.27] Pulumi stack: hybrid cloud configuration
+- [ ] [13.28] Pulumi config: required keys and validation
+- [ ] [13.29] Pulumi secrets: encrypted configuration
+- [ ] [13.30] Pulumi secrets: external secrets provider
+- [ ] [13.31] Pulumi outputs: all resource references
+- [ ] [13.32] Pulumi stack references for cross-stack
+- [ ] [13.33] Pulumi Policy as Code (compliance rules)
+- [ ] [13.34] Pulumi Policy: tagging enforcement
+- [ ] [13.35] Pulumi Policy: encryption enforcement
+- [ ] [13.36] Pulumi Policy: network security rules
+- [ ] [13.37] Pulumi Policy: cost management rules
+- [ ] [13.38] Pulumi Automation API for self-service infra
+- [ ] [13.39] Pulumi Automation API: ephemeral environments
+- [ ] [13.40] Pulumi Automation API: preview/approve workflow
+- [ ] [13.41] Pulumi alias/import for existing resources
+- [ ] [13.42] Pulumi refresh and reconcile scripts
+- [ ] [13.43] Pulumi CI/CD: GitHub Actions integration
+- [ ] [13.44] Pulumi CI/CD: preview on PR
+- [ ] [13.45] Pulumi CI/CD: auto-approve dev, manual prod
+- [ ] [13.46] Pulumi CI/CD: stack drift detection
+- [ ] [13.47] Pulumi CI/CD: up/refresh/destroy commands
+- [ ] [13.48] Pulumi local development workflow (Makefile)
+- [ ] [13.49] Pulumi and Terraform state comparison tool
+- [ ] [13.50] Pulumi provider: Kong gateway
+- [ ] [13.51] Pulumi provider: Helm charts
+- [ ] [13.52] Pulumi provider: Kubernetes (raw manifests)
+- [ ] [13.53] Pulumi integration with Cloudflare DNS
+- [ ] [13.54] Pulumi component: multi-cloud failover
+- [ ] [13.55] Pulumi component: hybrid cloud networking
+- [ ] [13.56] Pulumi component: backup and disaster recovery
+- [ ] [13.57] Pulumi unit tests (pulumi testing framework)
+- [ ] [13.58] Pulumi integration tests
+- [ ] [13.59] Pulumi policy pack tests
+- [ ] [13.60] Pulumi documentation
+- [ ] [13.61] Pulumi ESC: environment inheritance
+- [ ] [13.62] Pulumi ESC: secret rotation automation
+- [ ] [13.63] Pulumi ESC: dynamic configuration
+- [ ] [13.64] Pulumi program: AI infrastructure (GPU nodes)
+- [ ] [13.65] Pulumi program: vector DB infrastructure
+- [ ] [13.66] Pulumi program: monitoring stack
+- [ ] [13.67] Pulumi destroy protection (retainOnDelete)
+- [ ] [13.68] Pulumi upgrade automation (pulumi up)
+- [ ] [13.69] Pulumi conformance with Terraform coverage
+- [ ] [13.70] Documentation: Pulumi architecture comparison
+
+## Phase W3: Web3 Smart Contracts & Soulbound Tokens (95 commits)
+
+### Sub-Phase W3-A: Environment & Tooling (15)
+
+- [ ] [W3.01] Hardhat/Foundry project initialization in contracts/
+- [ ] [W3.02] Solidity compiler configuration (0.8.x)
+- [ ] [W3.03] OpenZeppelin dependency integration
+- [ ] [W3.04] Hardhat network config (local, testnet, mainnet)
+- [ ] [W3.05] Hardhat deploy scripts (deploy, verify, upgrade)
+- [ ] [W3.06] Hardhat tasks: mint, burn, lock, set-issuer
+- [ ] [W3.07] Hardhat console for manual testing
+- [ ] [W3.08] Foundry forge init (parallel to Hardhat)
+- [ ] [W3.09] Foundry fuzz testing setup
+- [ ] [W3.10] Forge invariant testing for soulbound invariants
+- [ ] [W3.11] Local Hardhat node with chain auto-mining
+- [ ] [W3.12] Wallet setup scripts (private key, mnemonic derivation)
+- [ ] [W3.13] Ethers.js v6 provider setup for Go/Python services
+- [ ] [W3.14] Web3.py provider setup for Python AI service
+- [ ] [W3.15] Cross-chain deployment configuration (Ethereum, Polygon, Optimism, Arbitrum)
+
+### Sub-Phase W3-B: Contract Implementation (25)
+
+- [ ] [W3.16] ERC-721 soulbound passport token contract
+- [ ] [W3.17] ERC-5192 Minimal Soulbound NFT interface implementation
+- [ ] [W3.18] Passport metadata schema (nameHash, reputationHash, issuer, timestamp)
+- [ ] [W3.19] Passport mint function (onlyAuthorized issuer role)
+- [ ] [W3.20] Passport burn function (holder opt-out with cooldown)
+- [ ] [W3.21] Passport revocation function (issuer-admin role)
+- [ ] [W3.22] Passport lock/unlock lifecycle events
+- [ ] [W3.23] Credential attestation contract (on-chain verifiable claims)
+- [ ] [W3.24] Attestation issuer registry (whitelist of trusted issuers)
+- [ ] [W3.25] Attestation verification function (verifyClaim(...))
+- [ ] [W3.26] Reputation oracle contract (off-chain → on-chain bridge)
+- [ ] [W3.27] Reputation score update with zero-knowledge proof verification
+- [ ] [W3.28] Reputation slash/penalty mechanism (for fraud)
+- [ ] [W3.29] Endorsement registry (peer-to-peer credibility staking)
+- [ ] [W3.30] Endorsement weight by endorser reputation
+- [ ] [W3.31] Dispute resolution DAO contract (governance-based)
+- [ ] [W3.32] Governance token for voting on credential standards
+- [ ] [W3.33] Timelock controller for parameter updates
+- [ ] [W3.34] Access control: OpenZeppelin Roles (minter, issuer, admin, burner)
+- [ ] [W3.35] Access control: Ownable2Step with multi-sig transfer
+- [ ] [W3.36] Pausable contract (emergency stop)
+- [ ] [W3.37] UUPS upgradeable proxy pattern for passport contract
+- [ ] [W3.38] Beacons for credential type factories
+- [ ] [W3.39] Gas optimization: ERC-721A batch minting
+- [ ] [W3.40] Event emission standards for off-chain indexing
+
+### Sub-Phase W3-C: Tokenomics & Metadata (10)
+
+- [ ] [W3.41] Metadata schema: on-chain base URI with IPFS/Arweave fallback
+- [ ] [W3.42] Metadata updater (issuer can update credential metadata)
+- [ ] [W3.43] Soulbound token URI resolver with capability-based access
+- [ ] [W3.44] Token-level metadata freeze (irreversible proof of issuance)
+- [ ] [W3.45] Reputation score token (non-transferable ERC-20 variant)
+- [ ] [W3.46] Staking contract for reputation-weighted voting
+- [ ] [W3.47] Reputation decay algorithm on-chain (time-weighted)
+- [ ] [W3.48] Credential type NFT (SBT collection categories)
+- [ ] [W3.49] Creator profile NFT (bundled identity + credentials + reputation)
+- [ ] [W3.50] Multi-token credential bundles (batch mint to same soul)
+
+### Sub-Phase W3-D: Off-Chain SDK & Integration (15)
+
+- [ ] [W3.51] Go SDK: ethers.js-compatible ABI bindings (abigen)
+- [ ] [W3.52] Go contract client: Passport.sol -> passport.go bindings
+- [ ] [W3.53] Go contract client: AttestationRegistry.sol bindings
+- [ ] [W3.54] Go contract client: ReputationOracle.sol bindings
+- [ ] [W3.55] Go SDK: transaction construction, signing, broadcasting
+- [ ] [W3.56] Go SDK: event listening and log parsing
+- [ ] [W3.57] Python SDK: web3.py contract interaction helpers
+- [ ] [W3.58] Python SDK: ReputationOracle subscriber
+- [ ] [W3.59] Python SDK: event-driven credential indexing
+- [ ] [W3.60] REST proxy: wallet-based authentication (EIP-4361 / Sign in with Ethereum)
+- [ ] [W3.61] REST proxy: passport issuance via REST → contract bridge
+- [ ] [W3.62] MetaMask / WalletConnect integration in any frontend
+- [ ] [W3.63] Ledger/Trezor hardware wallet support for admin ops
+- [ ] [W3.64] Off-chain credential aggregation (indexer service)
+- [ ] [W3.65] TheGraph subgraph for passport data querying
+
+### Sub-Phase W3-E: Layer 2 & Cross-Chain (10)
+
+- [ ] [W3.66] Optimism L2 deployment (OP Stack, reduced gas)
+- [ ] [W3.67] Arbitrum L2 deployment (Nitro, low fees)
+- [ ] [W3.68] Polygon PoS deployment (sidechain)
+- [ ] [W3.69] Base L2 deployment (Coinbase L2, EVM-equivalent)
+- [ ] [W3.70] Scroll zkEVM deployment (zero-knowledge L2)
+- [ ] [W3.71] Wormhole/Chainlink CCIP bridge for cross-chain passport verification
+- [ ] [W3.72] LayerZero OFT for cross-chain reputation data
+- [ ] [W3.73] zkSync Era deployment (ZK rollup, account abstraction)
+- [ ] [W3.74] Cross-chain state verification (light client verification)
+- [ ] [W3.75] Layer 2 gas cost comparison dashboard
+
+### Sub-Phase W3-F: On-Chain Verification (10)
+
+- [ ] [W3.76] Merkle proof verification contract for batch credential checking
+- [ ] [W3.77] Off-chain → on-chain data availability (Celestia blob for metadata)
+- [ ] [W3.78] EIP-712 typed signatures for gasless meta-transactions
+- [ ] [W3.79] ERC-2771 trusted forwarder for relayer-based minting
+- [ ] [W3.80] EIP-1271 contract signature validation (wallet-less verification)
+- [ ] [W3.81] EIP-4337 account abstraction for smart wallet holders
+- [ ] [W3.82] EIP-1155 multi-token for credential type bundles
+- [ ] [W3.83] EIP-1167 minimal proxy for credential factories
+- [ ] [W3.84] EIP-2981 royalty standard for credential marketplace (if applicable)
+- [ ] [W3.85] Chainlink oracle integration for off-chain reputation data
+
+### Sub-Phase W3-G: Testing & Security (10)
+
+- [ ] [W3.86] Solidity unit test suite (Hardhat): mint, burn, revoke, lock
+- [ ] [W3.87] Solidity unit test suite: access control, roles, pausing
+- [ ] [W3.88] Solidity unit test suite: upgradeable proxy patterns
+- [ ] [W3.89] Foundry fuzz test: malformed metadata URIs
+- [ ] [W3.90] Foundry invariant test: soulbound non-transferability invariant
+- [ ] [W3.91] Slither static analysis for smart contract vulnerabilities
+- [ ] [W3.92] Mythril symbolic execution for reentrancy/dos detection
+- [ ] [W3.93] Echidna fuzzing for property-based security
+- [ ] [W3.94] Certora formal verification for critical invariants
+- [ ] [W3.95] Smart contract audit preparation checklist
+
+## Phase 14: Robot Framework Tests (85 commits)
+
+- [ ] [14.01] Robot Framework directory structure
+- [ ] [14.02] Robot Framework global setup (robot --dryrun)
+- [ ] [14.03] robotframework-requests library integration
+- [ ] [14.04] robotframework-sshlibrary for infra testing
+- [ ] [14.05] robotframework-databaselibrary setup
+- [ ] [14.06] robotframework-jsonlibrary for API validation
+- [ ] [14.07] robotframework-faker for test data generation
+- [ ] [14.08] Pabot integration for parallel test execution
+- [ ] [14.09] Custom Robot Framework listener for reporting
+- [ ] [14.10] Base test suite: health check tests
+- [ ] [14.11] Base test suite: API availability tests
+- [ ] [14.12] Base test suite: response time validation
+- [ ] [14.13] Test data setup: credential fixtures
+- [ ] [14.14] Test data setup: user fixtures
+- [ ] [14.15] Test data setup: reputation fixtures
+- [ ] [14.16] Test environment configuration (variables file)
+- [ ] [14.17] Resource file: API keywords (Go service)
+- [ ] [14.18] Resource file: API keywords (Rust service)
+- [ ] [14.19] Resource file: API keywords (Python AI service)
+- [ ] [14.20] Resource file: API keywords (Julia analytics)
+- [ ] [14.21] Resource file: API keywords (QASM quantum)
+- [ ] [14.22] Resource file: database keywords
+- [ ] [14.23] Resource file: authentication keywords
+- [ ] [14.24] Resource file: assertion keywords (custom)
+- [ ] [14.25] Test suite: User registration flow
+- [ ] [14.26] Test suite: User authentication (JWT, OAuth2)
+- [ ] [14.27] Test suite: User profile management
+- [ ] [14.28] Test suite: Credential issuance (soulbound)
+- [ ] [14.29] Test suite: Credential verification
+- [ ] [14.30] Test suite: Credential revocation
+- [ ] [14.31] Test suite: Reputation scoring (basic)
+- [ ] [14.32] Test suite: Reputation scoring (edge cases)
+- [ ] [14.33] Test suite: Reputation history queries
+- [ ] [14.34] Test suite: Endorsement creation and verification
+- [ ] [14.35] Test suite: Endorsement trust chain
+- [ ] [14.36] Test suite: Review submission and moderation
+- [ ] [14.37] Test suite: Dispute resolution workflow
+- [ ] [14.38] Test suite: Admin CRUD operations
+- [ ] [14.39] Test suite: Marketplace listing management
+- [ ] [14.40] Test suite: Search and filtering
+- [ ] [14.41] Test suite: Trending/featured algorithms
+- [ ] [14.42] Test suite: Notification delivery
+- [ ] [14.43] Test suite: AI-powered moderation
+- [ ] [14.44] Test suite: Natural language query endpoint
+- [ ] [14.45] Test suite: RAG pipeline correctness
+- [ ] [14.46] Test suite: Vector DB search accuracy
+- [ ] [14.47] Test suite: Embedding pipeline validation
+- [ ] [14.48] Test suite: LLM response quality checks
+- [ ] [14.49] Test suite: DuckDB analytics queries
+- [ ] [14.50] Test suite: Trino federated queries
+- [ ] [14.51] Test suite: Iceberg table operations
+- [ ] [14.52] Test suite: Arrow Flight data access
+- [ ] [14.53] Test suite: PQC signature verification
+- [ ] [14.54] Test suite: QRNG service validation
+- [ ] [14.55] Test suite: Nginx proxy routing (all services)
+- [ ] [14.56] Test suite: Kong gateway plugin activation
+- [ ] [14.57] Test suite: Kong rate limiting (per-service)
+- [ ] [14.58] Test suite: Kong authentication (JWT, key)
+- [ ] [14.59] Test suite: Kong AI proxy routing
+- [ ] [14.60] Test suite: Kong AI content moderation
+- [ ] [14.61] Test suite: Kong caching behavior
+- [ ] [14.62] Test suite: Kong Prometheus metrics exposure
+- [ ] [14.63] Test suite: OpenTelemetry trace propagation
+- [ ] [14.64] Test suite: Distributed tracing across services
+- [ ] [14.65] Test suite: Cross-service gRPC communication
+- [ ] [14.66] Test suite: Event streaming via NATS
+- [ ] [14.67] Test suite: Postgres failover behavior
+- [ ] [14.68] Test suite: Redis cache hit/miss rates
+- [ ] [14.69] Test suite: MinIO S3 compatibility
+- [ ] [14.70] Test suite: Multi-language interop tests
+- [ ] [14.71] Test suite: End-to-end credential lifecycle
+- [ ] [14.72] Test suite: End-to-end reputation lifecycle
+- [ ] [14.73] Test suite: Performance baseline (response times)
+- [ ] [14.74] Test suite: Concurrent user simulation
+- [ ] [14.75] Test suite: Pagination, filtering, sorting
+- [ ] [14.76] Test suite: Error handling and error codes
+- [ ] [14.77] Test suite: Rate limiting (exceed limits)
+- [ ] [14.78] Test suite: Graceful degradation tests
+- [ ] [14.79] Test suite: Data consistency after restart
+- [ ] [14.80] Test suite: Rollback and recovery scenarios
+- [ ] [14.81] Robot Framework CI integration (GitHub Actions)
+- [ ] [14.82] Robot Framework report generation
+- [ ] [14.83] Robot Framework logging configuration
+- [ ] [14.84] Robot Framework parallel execution config
+- [ ] [14.85] Test data cleanup and teardown procedures
+
+## Phase 15: OWASP Top 10 Security Tests (70 commits)
+
+- [ ] [15.01] OWASP ZAP installation and configuration
+- [ ] [15.02] ZAP API client setup (Python/Robot)
+- [ ] [15.03] ZAP baseline scan automation script
+- [ ] [15.04] ZAP full active scan automation
+- [ ] [15.05] ZAP spider configuration (traditional + AJAX)
+- [ ] [15.06] ZAP context definition (auth, scope)
+- [ ] [15.07] ZAP authentication script (JWT login)
+- [ ] [15.08] ZAP custom policy definition
+- [ ] [15.09] ZAP alert filter configuration
+- [ ] [15.10] OWASP A01:2025 - Broken Access Control tests
+- [ ] [15.11] A01: Privilege escalation tests (user -> admin)
+- [ ] [15.12] A01: Horizontal access control tests
+- [ ] [15.13] A01: IDOR tests (credential access by another user)
+- [ ] [15.14] A01: Missing function-level access control
+- [ ] [15.15] OWASP A02:2025 - Cryptographic Failures tests
+- [ ] [15.16] A02: Weak TLS configuration detection
+- [ ] [15.17] A02: Weak cipher suite detection
+- [ ] [15.18] A02: Missing encryption at rest verification
+- [ ] [15.19] A02: Hardcoded secrets detection
+- [ ] [15.20] A02: Insufficient entropy in token generation
+- [ ] [15.21] OWASP A03:2025 - Injection tests
+- [ ] [15.22] A03: SQL injection (all endpoints, parameterized)
+- [ ] [15.23] A03: NoSQL injection (if applicable)
+- [ ] [15.24] A03: Command injection test
+- [ ] [15.25] A03: LDAP injection test
+- [ ] [15.26] A03: XPath injection test
+- [ ] [15.27] A03: Template injection (SSTI)
+- [ ] [15.28] A03: LLM prompt injection (AI-specific)
+- [ ] [15.29] OWASP A04:2025 - Insecure Design tests
+- [ ] [15.30] A04: Rate limiting bypass tests
+- [ ] [15.31] A04: Business logic flaw tests
+- [ ] [15.32] A04: Trust boundary violation tests
+- [ ] [15.33] OWASP A05:2025 - Security Misconfiguration tests
+- [ ] [15.34] A05: Default credentials scan
+- [ ] [15.35] A05: Unnecessary services exposed
+- [ ] [15.36] A05: CORS misconfiguration scan
+- [ ] [15.37] A05: Security headers audit (HSTS, CSP, etc.)
+- [ ] [15.38] A05: Debug/environment endpoints exposed
+- [ ] [15.39] OWASP A06:2025 - Vulnerable Components tests
+- [ ] [15.40] A06: Dependency scanning (Trivy, Snyk, Dependabot)
+- [ ] [15.41] A06: Container image vulnerability scan
+- [ ] [15.42] A06: SBOM generation and validation
+- [ ] [15.43] A06: Outdated library detection in pipelines
+- [ ] [15.44] OWASP A07:2025 - Auth & Session Mgmt tests
+- [ ] [15.45] A07: JWT token validation (signature, expiry)
+- [ ] [15.46] A07: Session fixation tests
+- [ ] [15.47] A07: Session timeout enforcement
+- [ ] [15.48] A07: Credential stuffing resilience tests
+- [ ] [15.49] OWASP A08:2025 - Data Integrity Failures tests
+- [ ] [15.50] A08: Credential tampering detection
+- [ ] [15.51] A08: Reputation score manipulation tests
+- [ ] [15.52] A08: Audit log integrity verification
+- [ ] [15.53] OWASP A09:2025 - Logging & Monitoring tests
+- [ ] [15.54] A09: Audit log completeness verification
+- [ ] [15.55] OWASP A10:2025 - SSRF tests
+- [ ] [15.56] A10: Server-side request forgery tests
+- [ ] [15.57] A10: URL validation bypass tests
+- [ ] [15.58] OWASP LLM Top 10 (AI-specific)
+- [ ] [15.59] LLM01: Prompt injection testing
+- [ ] [15.60] LLM02: Insecure output handling
+- [ ] [15.61] LLM03: Training data poisoning
+- [ ] [15.62] LLM04: Model denial of service
+- [ ] [15.63] LLM05: Supply chain vulnerabilities
+- [ ] [15.64] LLM06: Sensitive information disclosure
+- [ ] [15.65] LLM07: Insecure plugin design
+- [ ] [15.66] LLM08: Excessive agency
+- [ ] [15.67] LLM09: Overreliance on LLM
+- [ ] [15.68] LLM10: Model theft protection
+- [ ] [15.69] Security test report generation (Robot Framework)
+- [ ] [15.70] Security test CI pipeline integration
+
+## Phase 16: CI/CD Pipelines — GitHub Actions (65 commits)
+
+- [ ] [16.01] CI directory structure (.github/workflows/)
+- [ ] [16.02] Workflow: lint-go (golangci-lint)
+- [ ] [16.03] Workflow: lint-rust (clippy, rustfmt)
+- [ ] [16.04] Workflow: lint-python (ruff, mypy, black)
+- [ ] [16.05] Workflow: lint-julia (JuliaFormatter)
+- [ ] [16.06] Workflow: lint-all (aggregated)
+- [ ] [16.07] Workflow: build-go (cross-platform)
+- [ ] [16.08] Workflow: build-rust (cross-platform)
+- [ ] [16.09] Workflow: build-python (wheel)
+- [ ] [16.10] Workflow: build-all (parallel)
+- [ ] [16.11] Workflow: unit-test-go
+- [ ] [16.12] Workflow: unit-test-rust
+- [ ] [16.13] Workflow: unit-test-python
+- [ ] [16.14] Workflow: unit-test-julia
+- [ ] [16.15] Workflow: integration-test-api (go)
+- [ ] [16.16] Workflow: integration-test-data (rust)
+- [ ] [16.17] Workflow: integration-test-ai (python)
+- [ ] [16.18] Workflow: integration-test-all (parallel)
+- [ ] [16.19] Workflow: test-robotframework (acceptance)
+- [ ] [16.20] Workflow: test-owasp-zap (security scan)
+- [ ] [16.21] Workflow: test-performance (k6, locust)
+- [ ] [16.22] Workflow: test-fuzz (Rust)
+- [ ] [16.23] Workflow: test-benchmark (Rust criterion)
+- [ ] [16.24] Workflow: test-coverage (codecov, coveralls)
+- [ ] [16.25] Workflow: docker-build (all images)
+- [ ] [16.26] Workflow: docker-scan (Trivy scan)
+- [ ] [16.27] Workflow: docker-push (to GHCR)
+- [ ] [16.28] Workflow: helm-lint
+- [ ] [16.29] Workflow: helm-test (chart testing)
+- [ ] [16.30] Workflow: terraform-fmt
+- [ ] [16.31] Workflow: terraform-validate
+- [ ] [16.32] Workflow: terraform-plan (preview)
+- [ ] [16.33] Workflow: terraform-apply
+- [ ] [16.34] Workflow: pulumi-preview (on PR)
+- [ ] [16.35] Workflow: pulumi-up (on merge)
+- [ ] [16.36] Workflow: deploy-k8s-dev (helm upgrade)
+- [ ] [16.37] Workflow: deploy-k8s-staging
+- [ ] [16.38] Workflow: deploy-k8s-prod (with approval)
+- [ ] [16.39] Workflow: deploy-swarm-dev
+- [ ] [16.40] Workflow: deploy-swarm-prod
+- [ ] [16.41] Workflow: security-dependency-scan (Dependabot)
+- [ ] [16.42] Workflow: security-secrets-scan (trufflehog)
+- [ ] [16.43] Workflow: security-sast (semgrep, codeql)
+- [ ] [16.44] Workflow: security-dast (ZAP)
+- [ ] [16.45] Workflow: checkov (compliance)
+- [ ] [16.46] Workflow: sbom-generation (CycloneDX)
+- [ ] [16.47] Workflow: k8s-conformance (sonobuoy)
+- [ ] [16.48] Workflow: smoke-test-post-deploy
+- [ ] [16.49] Workflow: rollback-automation
+- [ ] [16.50] Workflow: backup-database (cron)
+- [ ] [16.51] Workflow: backup-k8s (velero cron)
+- [ ] [16.52] Workflow: terraform-destroy-ephemeral
+- [ ] [16.53] Workflow: pulumi-destroy-ephemeral
+- [ ] [16.54] Workflow: label-pr (automatic labeling)
+- [ ] [16.55] Workflow: assign-reviewers
+- [ ] [16.56] Workflow: auto-merge (dependencies)
+- [ ] [16.57] Workflow: release-please (semantic release)
+- [ ] [16.58] Workflow: changelog generation
+- [ ] [16.59] Workflow: renovate-bot config
+- [ ] [16.60] Workflow: nightly-e2e
+- [ ] [16.61] Workflow: security-nightly-scan
+- [ ] [16.62] Workflow: build-matrix for multi-arch
+- [ ] [16.63] Self-hosted runner setup for GPU/AI workflows
+- [ ] [16.64] Caching strategy for CI (actions/cache)
+- [ ] [16.65] CI documentation and onboarding guide
+
+## Phase 17: AI & Software-Tools Deep Integration (60 commits)
+
+- [ ] [17.01] Ollama model download automation (model registry)
+- [ ] [17.02] Ollama multi-model serving (A/B switch)
+- [ ] [17.03] Ollama + vLLM fallback chain
+- [ ] [17.04] vLLM PagedAttention optimization for production
+- [ ] [17.05] vLLM LoRA adapter serving for custom models
+- [ ] [17.06] vLLM speculative decoding setup
+- [ ] [17.07] SGLang structured output (JSON mode) for API
+- [ ] [17.08] SGLang constrained decoding for credential format
+- [ ] [17.09] llama.cpp edge deployment (Raspberry Pi / edge)
+- [ ] [17.10] llama.cpp quantization pipeline (auto-script)
+- [ ] [17.11] LM Studio dev/playground environment
+- [ ] [17.12] Chroma + Qdrant + Milvus + Weaviate unified API
+- [ ] [17.13] Vector DB migration scripts (cross-DB migration)
+- [ ] [17.14] Vector DB benchmark suite (ANN benchmarks)
+- [ ] [17.15] Chroma filtering + full-text search optimization
+- [ ] [17.16] Qdrant quantization + on-disk mode
+- [ ] [17.17] Milvus cluster scaling (data + query nodes)
+- [ ] [17.18] Weaviate multi-tenancy + sharding
+- [ ] [17.19] LanceDB multimodal storage (images + vectors)
+- [ ] [17.20] DuckDB + Postgres FDW (foreign data wrapper)
+- [ ] [17.21] DuckDB + Iceberg integration (native support)
+- [ ] [17.22] Trino cluster + auto-scaler
+- [ ] [17.23] Trino + Iceberg + Arrow Flight integration
+- [ ] [17.24] DataFusion UDFs for custom scoring
+- [ ] [17.25] Arrow Flight SQL ODBC/JDBC bridge
+- [ ] [17.26] W&B Weave production monitoring dashboard
+- [ ] [17.27] Weave custom evaluators for reputation LLM
+- [ ] [17.28] Weave prompts versioning for credential QA
+- [ ] [17.29] Weave datasets for threat detection eval
+- [ ] [17.30] Hermes Agent workflow: reputation monitoring
+- [ ] [17.31] Hermes Agent workflow: credential expiry alerts
+- [ ] [17.32] Hermes Agent workflow: moderation queue ingest
+- [ ] [17.33] Hermes Agent: Telegram/Slack notification skill
+- [ ] [17.34] Hermes Agent: Docker backend for task execution
+- [ ] [17.35] Agent Skills: credential verification SKILL.md
+- [ ] [17.36] Agent Skills: reputation analysis SKILL.md
+- [ ] [17.37] Agent Skills: dispute mediation SKILL.md
+- [ ] [17.38] MCP server: reputation-data MCP server
+- [ ] [17.39] MCP server: credential-query MCP server
+- [ ] [17.40] MCP server: analytics MCP server
+- [ ] [17.41] Claude Code project config (.claude/settings.json)
+- [ ] [17.42] Codex Desktop project config (codex.json)
+- [ ] [17.43] Devin integration config (.devin/config.yml)
+- [ ] [17.44] Hermes agent config (hermes.yml)
+- [ ] [17.45] OpenTelemetry LLM semantic conventions
+- [ ] [17.46] OpenTelemetry traces for all AI calls
+- [ ] [17.47] OpenTelemetry metrics: LLM token usage
+- [ ] [17.48] OpenTelemetry metrics: Vector DB query latency
+- [ ] [17.49] OpenTelemetry metrics: embedding generation time
+- [ ] [17.50] OpenTelemetry collector: tail-based sampling
+- [ ] [17.51] OpenTelemetry collector: batch processing
+- [ ] [17.52] OpenTelemetry exporter: Jaeger
+- [ ] [17.53] OpenTelemetry exporter: Tempo (Grafana)
+- [ ] [17.54] OpenTelemetry exporter: W&B Weave
+- [ ] [17.55] Cilium Tetragon: observability for AI traffic
+- [ ] [17.56] Cilium Tetragon: runtime enforcement policies
+- [ ] [17.57] Cilium Tetragon: process execution monitoring
+- [ ] [17.58] Grafana dashboard: AI service overview
+- [ ] [17.59] Grafana dashboard: LLM performance metrics
+- [ ] [17.60] Grafana dashboard: Vector DB health
+
+## Phase 18: Monitoring, Observability & Alerting (50 commits)
+
+- [ ] [18.01] Prometheus server configuration
+- [ ] [18.02] Prometheus service discovery (K8s, Consul)
+- [ ] [18.03] Prometheus recording rules for performance
+- [ ] [18.04] Prometheus alerting rules (critical)
+- [ ] [18.05] Prometheus alerting rules (warning)
+- [ ] [18.06] Alertmanager configuration
+- [ ] [18.07] Alertmanager receivers (email, Slack, PagerDuty)
+- [ ] [18.08] Alertmanager routing tree
+- [ ] [18.09] Alertmanager silence/inhibition rules
+- [ ] [18.10] Grafana data sources (Prometheus, Loki, Tempo)
+- [ ] [18.11] Grafana dashboard: service health overview
+- [ ] [18.12] Grafana dashboard: API latency (p50, p95, p99)
+- [ ] [18.13] Grafana dashboard: error rate (5xx, 4xx)
+- [ ] [18.14] Grafana dashboard: request throughput
+- [ ] [18.15] Grafana dashboard: database performance
+- [ ] [18.16] Grafana dashboard: cache hit rates
+- [ ] [18.17] Grafana dashboard: resource usage (CPU, memory, disk)
+- [ ] [18.18] Grafana dashboard: network traffic
+- [ ] [18.19] Grafana dashboard: Kong gateway metrics
+- [ ] [18.20] Grafana dashboard: Nginx metrics
+- [ ] [18.21] Grafana dashboard: K8s cluster overview
+- [ ] [18.22] Grafana dashboard: Docker Swarm overview
+- [ ] [18.23] Grafana dashboard: business metrics (reputation ops)
+- [ ] [18.24] Grafana dashboard: user growth/activity
+- [ ] [18.25] Grafana dashboard: credential issuance rate
+- [ ] [18.26] Grafana alerting via Grafana OnCall or AlertManager
+- [ ] [18.27] Loki log aggregation configuration
+- [ ] [18.28] Loki log shipping (Promtail, FluentBit)
+- [ ] [18.29] Loki log queries for troubleshooting
+- [ ] [18.30] Loki alerting rules
+- [ ] [18.31] Tempo trace storage and querying
+- [ ] [18.32] Tempo service graph for dependency mapping
+- [ ] [18.33] Tempo span metrics (RED metrics)
+- [ ] [18.34] Grafana trace to log correlation
+- [ ] [18.35] Grafana log to metric correlation
+- [ ] [18.36] Uptime monitoring (external probes)
+- [ ] [18.37] Synthetic monitoring (playwright/cypress scripts)
+- [ ] [18.38] SLA/SLO definition document
+- [ ] [18.39] SLI measurement and dashboard
+- [ ] [18.40] Error budget tracking
+- [ ] [18.41] Incident response runbook template
+- [ ] [18.42] On-call rotation setup (PagerDuty/Opsgenie)
+- [ ] [18.43] Status page (public/private)
+- [ ] [18.44] Log retention policy (short-term, long-term)
+- [ ] [18.45] Metric retention policy
+- [ ] [18.46] Trace sampling strategy (head/tail based)
+- [ ] [18.47] Monitoring for on-prem vs cloud parity
+- [ ] [18.48] Cost monitoring and chargeback (cloud)
+- [ ] [18.49] Capacity planning dashboards
+- [ ] [18.50] Monitoring documentation and onboarding
+
+## Phase 19: Security & Governance (40 commits)
+
+- [ ] [19.01] Security architecture document
+- [ ] [19.02] Threat model STRIDE analysis
+- [ ] [19.03] Data classification policy
+- [ ] [19.04] PII handling and anonymization procedures
+- [ ] [19.05] GDPR compliance checklist
+- [ ] [19.06] CCPA compliance checklist
+- [ ] [19.07] AI governance policy (responsible AI)
+- [ ] [19.08] Model card documentation for AI models
+- [ ] [19.09] Shadow AI governance (KawaiiGPT awareness policy)
+- [ ] [19.10] Acceptable use policy for AI tools
+- [ ] [19.11] Incident response playbook (security)
+- [ ] [19.12] Incident response playbook (AI incident)
+- [ ] [19.13] Secrets rotation policy and automation
+- [ ] [19.14] Certificate expiry monitoring and renewal
+- [ ] [19.15] K8s Pod Security Standards (baseline, restricted)
+- [ ] [19.16] K8s OPA/Gatekeeper policies
+- [ ] [19.17] K8s Kyverno policies for compliance
+- [ ] [19.18] Container image signing (Cosign)
+- [ ] [19.19] Software supply chain security (SLSA framework)
+- [ ] [19.20] SBOM generation in CI (CycloneDX format)
+- [ ] [19.21] Vulnerability management process
+- [ ] [19.22] Penetration testing schedule and scope
+- [ ] [19.23] Bug bounty program guidelines
+- [ ] [19.24] Third-party vendor security review
+- [ ] [19.25] Dependency license compliance (FOSSA)
+- [ ] [19.26] Network segmentation policy
+- [ ] [19.27] Firewall rule audit procedure
+- [ ] [19.28] Database encryption at rest configuration
+- [ ] [19.29] TLS certificate management (public + internal CA)
+- [ ] [19.30] mTLS configuration for service mesh
+- [ ] [19.31] API key management and rotation
+- [ ] [19.32] Rate limiting and DDoS protection strategy
+- [ ] [19.33] WAF rules (AWS WAF, Cloud Armor)
+- [ ] [19.34] IDS/IPS configuration (Snort/Suricata)
+- [ ] [19.35] Security benchmarks (CIS benchmarks)
+- [ ] [19.36] K8s CIS benchmark scanning (kube-bench)
+- [ ] [19.37] Infrastructure compliance scanning (checkov)
+- [ ] [19.38] Security training materials for team
+- [ ] [19.39] Security review checklist for PRs
+- [ ] [19.40] Quarterly security review process
+
+## Phase 20: Documentation, Runbooks & Launch (30 commits)
+
+- [ ] [20.01] Architecture documentation (comprehensive)
+- [ ] [20.02] API reference (OpenAPI 3.0, all services)
+- [ ] [20.03] Developer onboarding guide
+- [ ] [20.04] Local development setup guide
+- [ ] [20.05] Environment configuration reference
+- [ ] [20.06] Database schema documentation
+- [ ] [20.07] Deployment runbook: K8s
+- [ ] [20.08] Deployment runbook: Docker Swarm
+- [ ] [20.09] Deployment runbook: On-premises
+- [ ] [20.10] Deployment runbook: Hybrid cloud
+- [ ] [20.11] Incident response runbook (operations)
+- [ ] [20.12] Database backup and restore runbook
+- [ ] [20.13] Disaster recovery plan
+- [ ] [20.14] Scaling runbook (vertical, horizontal)
+- [ ] [20.15] Performance tuning guide
+- [ ] [20.16] Security hardening guide
+- [ ] [20.17] AI model management guide
+- [ ] [20.18] Vector DB operations guide
+- [ ] [20.19] Kong gateway administration guide
+- [ ] [20.20] Nginx administration guide
+- [ ] [20.21] Terraform operations guide
+- [ ] [20.22] Pulumi operations guide
+- [ ] [20.23] Monitoring and alerting runbook
+- [ ] [20.24] Logging and tracing troubleshooting
+- [ ] [20.25] CI/CD pipeline reference
+- [ ] [20.26] Release process and versioning
+- [ ] [20.27] Upgrade/downgrade procedures
+- [ ] [20.28] Testing strategy document (all levels)
+- [ ] [20.29] Load testing methodology
+- [ ] [20.30] Production readiness checklist
