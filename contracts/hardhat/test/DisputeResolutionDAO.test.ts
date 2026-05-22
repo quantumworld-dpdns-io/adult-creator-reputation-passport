@@ -37,14 +37,21 @@ describe("DisputeResolutionDAO", function () {
 
   it("should cast votes and resolve", async function () {
     await dao.connect(plaintiff).fileDispute(defendant.address, "s1", "desc");
-    const dispute = await dao.getDispute(0);
-    if (dispute.status === 2) {
-      // deliberation
-    }
     await dao.connect(plaintiff).submitEvidence(0, "ipfs://uri", "proof");
+    await dao.connect(admin).startDeliberation(0);
+    await dao.connect(juror).castVote(0, 1, "Valid claim");
     await dao.connect(admin).resolveDispute(0, 1, "Upholding the claim");
     const resolved = await dao.getDispute(0);
     expect(resolved.status).to.equal(3); // Resolved
     expect(resolved.resolution).to.equal(1); // Uphold
+  });
+
+  it("should reject vote from non-juror", async function () {
+    await dao.connect(plaintiff).fileDispute(defendant.address, "s1", "desc");
+    await dao.connect(plaintiff).submitEvidence(0, "ipfs://uri", "proof");
+    await dao.connect(admin).startDeliberation(0);
+    await expect(
+      dao.connect(plaintiff).castVote(0, 1, "Not a juror")
+    ).to.be.reverted;
   });
 });
