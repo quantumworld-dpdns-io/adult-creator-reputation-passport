@@ -23,7 +23,7 @@ export function HomePage() {
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: 48 }}>
-        <DotMatrixText text="ADULT CREATOR REPUTATION PASSPORT" size={28} />
+        <DotMatrixText>ADULT CREATOR REPUTATION PASSPORT</DotMatrixText>
         <p style={{ color: "#aaa", fontSize: 13, marginTop: 8 }}>
           Portable soulbound credentials for professionalism and reliability
           without exposing public identity
@@ -31,7 +31,10 @@ export function HomePage() {
         <RadarScan />
       </div>
 
-      <NothingCard title="Features" style={{ marginBottom: 32 }}>
+      <NothingCard style={{ marginBottom: 32 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Features
+        </div>
         <ul style={{ lineHeight: 2, fontSize: 13, paddingLeft: 20 }}>
           <li>ERC-5192 Soulbound Token (non-transferable) credential passport</li>
           <li>Post-Quantum Cryptography — ML-KEM-768, ML-DSA-65 hybrid TLS on Nginx</li>
@@ -52,12 +55,15 @@ export function HomePage() {
         </h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {badges.map((b) => (
-            <PillBadge key={b} label={b} />
+            <PillBadge key={b}>{b}</PillBadge>
           ))}
         </div>
       </div>
 
-      <NothingCard title="Quick Start">
+      <NothingCard>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Quick Start
+        </div>
         <pre style={{
           background: "#111",
           padding: 16,
@@ -86,7 +92,7 @@ npx hardhat run scripts/deploy.ts --network sepolia`}
       </NothingCard>
 
       <div style={{ textAlign: "center", marginTop: 32 }}>
-        <ProgressDots total={6} active={0} />
+        <ProgressDots value={0} max={5} count={6} />
         <p style={{ fontSize: 11, color: "#555", marginTop: 8 }}>
           Explore the sections above to learn more
         </p>
