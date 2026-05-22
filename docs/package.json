@@ -6,7 +6,8 @@
   "description": "Adult Creator Reputation Passport documentation & component demo",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit --skipLibCheck",
     "preview": "vite preview"
   },
   "dependencies": {
