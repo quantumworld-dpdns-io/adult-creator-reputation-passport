@@ -1,15 +1,227 @@
-name: CI
+name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_TAG: ${{ github.sha }}
+
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: [go, rust, python]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint ${{ matrix.language }}
+        run: make lint-${{ matrix.language }}
+      - name: Upload lint results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: lint-results.sarif
+
+  unit-test:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [go-api, rust-data, python-ai]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ${{ matrix.service }} unit tests
+        run: make test
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.out,./lcov.info
+
+  security-scan:
+    needs: [lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder build step
-        run: echo "Add your build/test commands here"
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+      - name: Run TruffleHog secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: .
+          base: ${{ github.event.repository.default_branch }}
+          head: ${{ github.head_ref }}
+
+  docker-build:
+    needs: [unit-test, security-scan]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: go-api
+            context: src/go
+            dockerfile: src/go/Dockerfile
+          - name: rust-data
+            context: src/rust
+            dockerfile: src/rust/Dockerfile
+          - name: python-ai
+            context: src/python
+            dockerfile: src/python/Dockerfile
+          - name: nginx-pqc
+            context: nginx
+            dockerfile: nginx/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
+          format: sarif
+          output: trivy-image-${{ matrix.service.name }}.sarif
+
+  acceptance-test:
+    needs: [docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start services
+        run: docker compose up -d go-api postgres redis
+      - name: Wait for services
+        run: sleep 15
+      - name: Run Robot Framework tests
+        uses: joonvena/robotframework-docker-action@v5
+        with:
+          robot_tests_dir: tests/robot
+          robot_output_dir: robot-results
+      - name: Upload Robot Framework results
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-results
+          path: robot-results/
+      - name: Stop services
+        run: docker compose down
+
+  owasp-zap-scan:
+    needs: [docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start services with ZAP
+        run: |
+          docker compose up -d
+          docker run -d --network host -v $(pwd)/tests/owasp:/zap/wrk \
+            -v $(pwd)/tests/owasp/context:/zap/context \
+            --name zap softwaresecurityproject/zap-stable \
+            zap.sh -daemon -host 0.0.0.0 -port 8090 \
+            -config api.key=zap-api-key-2026
+      - name: Run ZAP full scan
+        run: |
+          docker exec zap zap-cli -p 8090 -a zap-api-key-2026 \
+            open-url http://localhost:80
+          docker exec zap zap-cli -p 8090 -a zap-api-key-2026 \
+            spider http://localhost:80
+          docker exec zap zap-cli -p 8090 -a zap-api-key-2026 \
+            active-scan http://localhost:80
+          docker exec zap zap-cli -p 8090 -a zap-api-key-2026 \
+            report -o /zap/wrk/zap-report.html -f html
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: tests/owasp/zap-report.html
+      - name: Stop services
+        run: docker compose down
+
+  terraform-plan:
+    needs: [acceptance-test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive terraform/
+      - name: Terraform init
+        run: terraform init terraform/environments/dev
+      - name: Terraform validate
+        run: terraform validate terraform/environments/dev
+      - name: Terraform plan
+        run: terraform plan -no-color terraform/environments/dev
+
+  pulumi-preview:
+    needs: [acceptance-test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pulumi/actions@v5
+        with:
+          command: preview
+          stack-name: dev
+          work-dir: pulumi/programs/infra
+          comment-on-pr: true
+
+  deploy-staging:
+    needs: [acceptance-test, owasp-zap-scan, terraform-plan, pulumi-preview]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging K8s
+        run: |
+          helm upgrade --install reputation-passport helm/ \
+            --namespace reputation-passport-staging \
+            --values helm/values.yaml \
+            --set global.environment=staging
+
+  deploy-production:
+    needs: [deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production
+        run: |
+          helm upgrade --install reputation-passport helm/ \
+            --namespace reputation-passport-prod \
+            --values helm/values.yaml \
+            --set global.environment=production
