@@ -4,7 +4,6 @@ import {
   NothingButton,
   NothingCard,
   PillBadge,
-  DottedDivider,
   BarcodeGenerator,
   RadarScan,
   ProgressDots,
@@ -49,7 +48,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         gap: 16,
       }}>
         <div>
-          <DotMatrixText text="REPUTATION PASSPORT" />
+          <DotMatrixText>REPUTATION PASSPORT</DotMatrixText>
           <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
             Adult Creator · Soulbound Credentials · PQC Quantum
           </div>
@@ -62,8 +61,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               style={{ textDecoration: "none" }}
             >
               <NothingButton
-                active={location.pathname === item.path}
-                style={{ fontSize: 11, padding: "4px 12px" }}
+                variant={location.pathname === item.path ? "primary" : "ghost"}
               >
                 {item.label}
               </NothingButton>
