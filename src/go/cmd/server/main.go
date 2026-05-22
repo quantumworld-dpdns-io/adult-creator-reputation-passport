@@ -26,7 +26,7 @@ func main() {
 	r.Use(otelgin.Middleware("go-api"))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.CORS(cfg.CORSOrigins))
-	r.Use(middleware.RateLimiter(cfg.RateLimit))
+	r.Use(middleware.NewRateLimiter(cfg.RateLimit))
 
 	r.GET("/healthz", handler.HealthCheck)
 	r.GET("/readyz", handler.ReadinessCheck)
