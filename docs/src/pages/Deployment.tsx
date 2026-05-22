@@ -3,79 +3,65 @@ import { DotMatrixText, NothingCard, SegmentedDisplay } from "@dennislee928/noth
 export function DeploymentPage() {
   return (
     <div>
-      <DotMatrixText text="DEPLOYMENT" size={24} />
+      <DotMatrixText>DEPLOYMENT</DotMatrixText>
       <p style={{ color: "#aaa", fontSize: 13, marginBottom: 32 }}>
         Multi-platform infrastructure with full IaC coverage
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <NothingCard title="Kubernetes">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Kubernetes
+          </div>
           <pre style={{
-            background: "#111",
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 11,
-            color: "#0f0",
-            overflow: "auto",
+            background: "#111", padding: 12, borderRadius: 4, fontSize: 11, color: "#0f0", overflow: "auto",
           }}>
-{`# Deploy with Helm
-helm upgrade --install passport \\
+{`helm upgrade --install passport \\
   ./helm \\
   --namespace passport-prod \\
   --set global.environment=production
 
-# Verify
 kubectl get pods -n passport-prod
 kubectl get svc -n passport-prod`}
           </pre>
         </NothingCard>
-        <NothingCard title="Docker Swarm">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Docker Swarm
+          </div>
           <pre style={{
-            background: "#111",
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 11,
-            color: "#0f0",
-            overflow: "auto",
+            background: "#111", padding: 12, borderRadius: 4, fontSize: 11, color: "#0f0", overflow: "auto",
           }}>
-{`# Deploy stack
-docker stack deploy -c \\
+{`docker stack deploy -c \\
   docker-swarm.yml passport
 
-# Verify
 docker stack services passport
 docker service logs passport_go-api`}
           </pre>
         </NothingCard>
-        <NothingCard title="Terraform">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Terraform
+          </div>
           <pre style={{
-            background: "#111",
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 11,
-            color: "#0f0",
-            overflow: "auto",
+            background: "#111", padding: 12, borderRadius: 4, fontSize: 11, color: "#0f0", overflow: "auto",
           }}>
-{`# AWS infrastructure
-cd terraform/environments/dev
+{`cd terraform/environments/dev
 terraform init
 terraform plan
 terraform apply
 
-# Modules: VPC, EKS, RDS, ElastiCache, ECR`}
+# VPC, EKS, RDS, ElastiCache, ECR`}
           </pre>
         </NothingCard>
-        <NothingCard title="Pulumi">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Pulumi
+          </div>
           <pre style={{
-            background: "#111",
-            padding: 12,
-            borderRadius: 4,
-            fontSize: 11,
-            color: "#0f0",
-            overflow: "auto",
+            background: "#111", padding: 12, borderRadius: 4, fontSize: 11, color: "#0f0", overflow: "auto",
           }}>
-{`# Go-based Pulumi program
-cd pulumi/programs/infra
+{`cd pulumi/programs/infra
 pulumi up --stack dev
 
 # Stacks: dev, staging, prod, on-prem`}
@@ -83,7 +69,10 @@ pulumi up --stack dev
         </NothingCard>
       </div>
 
-      <NothingCard title="Environments" style={{ marginTop: 24 }}>
+      <NothingCard style={{ marginTop: 24 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Environments
+        </div>
         <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #333" }}>
@@ -112,13 +101,12 @@ pulumi up --stack dev
         </table>
       </NothingCard>
 
-      <NothingCard title="CI/CD Pipeline" style={{ marginTop: 16 }}>
+      <NothingCard style={{ marginTop: 16 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          CI/CD Pipeline
+        </div>
         <pre style={{
-          background: "#111",
-          padding: 16,
-          borderRadius: 4,
-          fontSize: 12,
-          color: "#0f0",
+          background: "#111", padding: 16, borderRadius: 4, fontSize: 12, color: "#0f0",
         }}>
 {`Lint (Go, Rust, Python)
   └─► Unit Test (go-api, rust-data, python-ai)

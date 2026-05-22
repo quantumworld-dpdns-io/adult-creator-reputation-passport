@@ -71,7 +71,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Generate SBOM
-        uses: aquasecurity/sbom-action@v0
+        uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image.name }}:latest
           format: spdx-json

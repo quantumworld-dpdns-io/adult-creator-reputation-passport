@@ -1,77 +1,38 @@
 import { DotMatrixText, NothingCard, TerminalPrompt } from "@dennislee928/nothingx-react-components";
 
 const endpoints = [
-  {
-    method: "GET",
-    path: "/healthz",
-    desc: "Health check",
-  },
-  {
-    method: "GET",
-    path: "/readyz",
-    desc: "Readiness check",
-  },
-  {
-    method: "GET",
-    path: "/api/v1/credentials/:id",
-    desc: "Get credential by ID",
-  },
-  {
-    method: "POST",
-    path: "/api/v1/credentials",
-    desc: "Issue a new credential",
-  },
-  {
-    method: "POST",
-    path: "/api/v1/credentials/verify",
-    desc: "Verify a credential",
-  },
-  {
-    method: "POST",
-    path: "/api/v1/credentials/:id/revoke",
-    desc: "Revoke a credential",
-  },
-  {
-    method: "GET",
-    path: "/api/v1/reputation/:hash",
-    desc: "Get reputation score",
-  },
-  {
-    method: "GET",
-    path: "/api/v1/reputation/:hash/history",
-    desc: "Get reputation history",
-  },
-  {
-    method: "POST",
-    path: "/api/v1/endorsements",
-    desc: "Add an endorsement",
-  },
-  {
-    method: "GET",
-    path: "/api/v1/endorsements/:hash",
-    desc: "Get endorsements for a subject",
-  },
-  {
-    method: "GET",
-    path: "/api/v1/profiles/:id",
-    desc: "Get creator profile",
-  },
-  {
-    method: "PUT",
-    path: "/api/v1/profiles/:id",
-    desc: "Update creator profile",
-  },
+  { method: "GET", path: "/healthz", desc: "Health check" },
+  { method: "GET", path: "/readyz", desc: "Readiness check" },
+  { method: "GET", path: "/api/v1/credentials/:id", desc: "Get credential by ID" },
+  { method: "POST", path: "/api/v1/credentials", desc: "Issue a new credential" },
+  { method: "POST", path: "/api/v1/credentials/verify", desc: "Verify a credential" },
+  { method: "POST", path: "/api/v1/credentials/:id/revoke", desc: "Revoke a credential" },
+  { method: "GET", path: "/api/v1/reputation/:hash", desc: "Get reputation score" },
+  { method: "GET", path: "/api/v1/reputation/:hash/history", desc: "Get reputation history" },
+  { method: "POST", path: "/api/v1/endorsements", desc: "Add an endorsement" },
+  { method: "GET", path: "/api/v1/endorsements/:hash", desc: "Get endorsements" },
+  { method: "GET", path: "/api/v1/profiles/:id", desc: "Get creator profile" },
+  { method: "PUT", path: "/api/v1/profiles/:id", desc: "Update creator profile" },
 ];
+
+const methodColors: Record<string, string> = {
+  GET: "#4fc3f7",
+  POST: "#81c784",
+  PUT: "#ffb74d",
+};
 
 export function ApiPage() {
   return (
     <div>
-      <DotMatrixText text="API REFERENCE" size={24} />
+      <DotMatrixText>API REFERENCE</DotMatrixText>
       <p style={{ color: "#aaa", fontSize: 13, marginBottom: 32 }}>
         Go (Gin) HTTP API · JWT Auth · OpenTelemetry Tracing
       </p>
 
-      <NothingCard title="Endpoints">
+      <NothingCard>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Endpoints
+        </div>
         <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #333" }}>
@@ -84,10 +45,7 @@ export function ApiPage() {
             {endpoints.map((ep) => (
               <tr key={ep.path} style={{ borderBottom: "1px solid #222" }}>
                 <td style={{ padding: "8px 12px" }}>
-                  <span style={{
-                    color: ep.method === "GET" ? "#4fc3f7" : "#81c784",
-                    fontWeight: "bold",
-                  }}>
+                  <span style={{ color: methodColors[ep.method] || "#fff", fontWeight: "bold" }}>
                     {ep.method}
                   </span>
                 </td>
@@ -103,9 +61,20 @@ export function ApiPage() {
         </table>
       </NothingCard>
 
-      <NothingCard title="Example Request" style={{ marginTop: 24 }}>
-        <TerminalPrompt
-          command={`curl -X POST https://api.reputation-passport.io/api/v1/credentials \\
+      <NothingCard style={{ marginTop: 24 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Example Request
+        </div>
+        <TerminalPrompt prompt="$ " initialInput="curl -X POST https://..." />
+        <pre style={{
+          background: "#111",
+          padding: 12,
+          borderRadius: 4,
+          fontSize: 11,
+          color: "#aaa",
+          marginTop: 8,
+        }}>
+{`curl -X POST https://api.reputation-passport.io/api/v1/credentials \\
   -H "Authorization: Bearer <jwt>" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -113,10 +82,13 @@ export function ApiPage() {
     "credential_type": "identity_verification",
     "expires_at": 1893456000
   }'`}
-        />
+        </pre>
       </NothingCard>
 
-      <NothingCard title="Example Response" style={{ marginTop: 16 }}>
+      <NothingCard style={{ marginTop: 16 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Example Response
+        </div>
         <pre style={{
           background: "#111",
           padding: 16,

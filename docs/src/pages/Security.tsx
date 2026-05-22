@@ -55,16 +55,19 @@ const owaspTests = [
 export function SecurityPage() {
   return (
     <div>
-      <DotMatrixText text="SECURITY" size={24} />
+      <DotMatrixText>SECURITY</DotMatrixText>
       <p style={{ color: "#aaa", fontSize: 13, marginBottom: 32 }}>
         Defense-in-depth across all layers
       </p>
 
-      <GlitchText text="PQC · OWASP · DEFENSE IN DEPTH" />
+      <GlitchText>PQC · OWASP · DEFENSE IN DEPTH</GlitchText>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 24 }}>
         {securityLayers.map((layer) => (
-          <NothingCard key={layer.title} title={layer.title}>
+          <NothingCard key={layer.title}>
+            <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+              {layer.title}
+            </div>
             <ul style={{ fontSize: 12, lineHeight: 2, paddingLeft: 16, color: "#aaa" }}>
               {layer.items.map((item) => (
                 <li key={item}>{item}</li>
@@ -74,19 +77,23 @@ export function SecurityPage() {
         ))}
       </div>
 
-      <NothingCard title="OWASP Top 10 Coverage" style={{ marginTop: 24 }}>
+      <NothingCard style={{ marginTop: 24 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          OWASP Top 10 Coverage
+        </div>
         <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #333" }}>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#888" }}>ID</th>
               <th style={{ padding: "8px 12px", textAlign: "left", color: "#888" }}>Category</th>
-              <th style={{ padding: "8px 12px", textAlign: "left", color: "#888" }}>Test</th>
+              <th style={{ padding: "8px 12px", textAlign: "left", color: "#888" }}>Coverage</th>
             </tr>
           </thead>
           <tbody>
             {owaspTests.map((t) => (
               <tr key={t.id} style={{ borderBottom: "1px solid #222" }}>
                 <td style={{ padding: "8px 12px" }}>
-                  <PillBadge label={t.id} />
+                  <PillBadge variant="off">{t.id}</PillBadge>
                 </td>
                 <td style={{ padding: "8px 12px", color: "#aaa" }}>{t.name}</td>
                 <td style={{ padding: "8px 12px" }}>{t.desc}</td>
@@ -96,13 +103,12 @@ export function SecurityPage() {
         </table>
       </NothingCard>
 
-      <NothingCard title="Rate Limiting" style={{ marginTop: 16 }}>
+      <NothingCard style={{ marginTop: 16 }}>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          Rate Limiting
+        </div>
         <pre style={{
-          background: "#111",
-          padding: 16,
-          borderRadius: 4,
-          fontSize: 12,
-          color: "#0f0",
+          background: "#111", padding: 16, borderRadius: 4, fontSize: 12, color: "#0f0",
         }}>
 {`# Default: 100 requests/minute per IP
 # Test: 150 requests in burst → 429 Too Many Requests

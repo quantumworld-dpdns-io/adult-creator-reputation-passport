@@ -3,12 +3,15 @@ import { DotMatrixText, NothingCard, SegmentedDisplay } from "@dennislee928/noth
 export function ArchitecturePage() {
   return (
     <div>
-      <DotMatrixText text="ARCHITECTURE" size={24} />
+      <DotMatrixText>ARCHITECTURE</DotMatrixText>
       <p style={{ color: "#aaa", fontSize: 13, marginBottom: 32 }}>
         End-to-end system architecture from client to data layer
       </p>
 
-      <NothingCard title="System Flow">
+      <NothingCard>
+        <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+          System Flow
+        </div>
         <pre style={{
           background: "#111",
           padding: 16,
@@ -55,7 +58,10 @@ export function ArchitecturePage() {
       </NothingCard>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 24 }}>
-        <NothingCard title="Gateway Layer">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Gateway Layer
+          </div>
           <ul style={{ fontSize: 12, lineHeight: 2, paddingLeft: 16 }}>
             <li>Nginx with oqs-provider (ML-KEM-768+X25519)</li>
             <li>Dual-stack RSA + PQC certificates</li>
@@ -65,7 +71,10 @@ export function ArchitecturePage() {
             <li>AI Proxy, JWT, rate-limiting, CORS</li>
           </ul>
         </NothingCard>
-        <NothingCard title="Service Layer">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Service Layer
+          </div>
           <ul style={{ fontSize: 12, lineHeight: 2, paddingLeft: 16 }}>
             <li>Go: HTTP API, JWT auth, CRUD operations</li>
             <li>Rust: Data processing, DuckDB, Arrow</li>
@@ -75,7 +84,10 @@ export function ArchitecturePage() {
             <li>gRPC/protobuf inter-service comms</li>
           </ul>
         </NothingCard>
-        <NothingCard title="Blockchain Layer">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Blockchain Layer
+          </div>
           <ul style={{ fontSize: 12, lineHeight: 2, paddingLeft: 16 }}>
             <li>ERC-5192 Soulbound NFT passports</li>
             <li>Reputation oracle with proof hashes</li>
@@ -85,7 +97,10 @@ export function ArchitecturePage() {
             <li>Hardhat + Foundry test coverage</li>
           </ul>
         </NothingCard>
-        <NothingCard title="Observability + Security">
+        <NothingCard>
+          <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 12, color: "#888" }}>
+            Observability + Security
+          </div>
           <ul style={{ fontSize: 12, lineHeight: 2, paddingLeft: 16 }}>
             <li>OpenTelemetry distributed tracing</li>
             <li>Prometheus metrics + Grafana dashboards</li>
@@ -99,8 +114,8 @@ export function ArchitecturePage() {
 
       <div style={{ marginTop: 32 }}>
         <SegmentedDisplay value="POLYGLOT" />
-        <SegmentedDisplay value="QUANTUM SAFE" style={{ marginTop: 8 }} />
-        <SegmentedDisplay value="WEB3 NATIVE" style={{ marginTop: 8 }} />
+        <div style={{ marginTop: 8 }}><SegmentedDisplay value="QUANTUM SAFE" /></div>
+        <div style={{ marginTop: 8 }}><SegmentedDisplay value="WEB3 NATIVE" /></div>
       </div>
     </div>
   );
