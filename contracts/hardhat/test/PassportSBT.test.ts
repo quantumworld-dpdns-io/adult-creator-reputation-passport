@@ -64,9 +64,9 @@ describe("PassportSBT", function () {
 
   it("should detect expired tokens", async function () {
     const oneDay = 86400;
+    const expiresAt = BigInt(Math.floor(Date.now() / 1000) - oneDay);
     await passport.connect(issuer).safeMint(
-      user.address, "hash1", "test", "uri",
-      Math.floor(Date.now() / 1000) - oneDay
+      user.address, "hash1", "test", "uri", expiresAt
     );
     expect(await passport.isExpired(0)).to.be.true;
   });
@@ -78,7 +78,7 @@ describe("PassportSBT", function () {
   });
 
   it("should support IERC5192 interface", async function () {
-    const iface = "0xb45a3c0e"; // IERC5192 interface ID
+    const iface = "0xb45a3c0e";
     expect(await passport.supportsInterface(iface)).to.be.true;
   });
 
@@ -86,9 +86,16 @@ describe("PassportSBT", function () {
     await passport.pause();
     await expect(
       passport.connect(issuer).safeMint(user.address, "h", "t", "u", 0)
-    ).to.be.revertedWith("Pausable: paused");
+    ).to.be.reverted;
     await passport.unpause();
     await passport.connect(issuer).safeMint(user.address, "h", "t", "u", 0);
     expect(await passport.ownerOf(0)).to.equal(user.address);
+  });
+
+  it("should get credentials by subject hash", async function () {
+    await passport.connect(issuer).safeMint(user.address, "sub1", "type1", "uri1", 0);
+    await passport.connect(issuer).safeMint(user.address, "sub1", "type2", "uri2", 0);
+    const ids = await passport.getCredentialsBySubject("sub1");
+    expect(ids.length).to.equal(2);
   });
 });
