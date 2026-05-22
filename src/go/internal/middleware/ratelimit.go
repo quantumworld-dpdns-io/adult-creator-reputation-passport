@@ -20,7 +20,7 @@ type RateLimiter struct {
 	window   time.Duration
 }
 
-func RateLimiter(limit int) gin.HandlerFunc {
+func NewRateLimiter(limit int) gin.HandlerFunc {
 	rl := &RateLimiter{
 		visitors: make(map[string]*visitor),
 		limit:    limit,
