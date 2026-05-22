@@ -118,6 +118,7 @@ export interface DisputeResolutionDAOInterface extends Interface {
       | "resolveDispute"
       | "revokeRole"
       | "setVotingPeriod"
+      | "startDeliberation"
       | "submitEvidence"
       | "supportsInterface"
   ): FunctionFragment;
@@ -201,6 +202,10 @@ export interface DisputeResolutionDAOInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "startDeliberation",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "submitEvidence",
     values: [BigNumberish, string, string]
   ): string;
@@ -251,6 +256,10 @@ export interface DisputeResolutionDAOInterface extends Interface {
   decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setVotingPeriod",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "startDeliberation",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -546,6 +555,12 @@ export interface DisputeResolutionDAO extends BaseContract {
     "nonpayable"
   >;
 
+  startDeliberation: TypedContractMethod<
+    [disputeId: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
   submitEvidence: TypedContractMethod<
     [disputeId: BigNumberish, uri: string, description: string],
     [void],
@@ -653,6 +668,9 @@ export interface DisputeResolutionDAO extends BaseContract {
   getFunction(
     nameOrSignature: "setVotingPeriod"
   ): TypedContractMethod<[period: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "startDeliberation"
+  ): TypedContractMethod<[disputeId: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "submitEvidence"
   ): TypedContractMethod<
