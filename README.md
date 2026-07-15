@@ -272,3 +272,7 @@ See [PLAN.md](PLAN.md) for the complete 1,405-commit implementation plan across 
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
+
+
+---
+Julia language: [#JuliaLang](https://julialang.org/) | [JuliaLang GitHub](https://github.com/JuliaLang/julia)
